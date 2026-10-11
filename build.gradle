@@ -26,6 +26,8 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
     compileOnly "me.shedaniel.cloth:cloth-config-fabric:26.3.158"
     compileOnly "com.terraformersmc:modmenu:21.0.0-beta.1"
+    testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 processResources {
     inputs.property 'version', project.version
@@ -40,3 +42,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
     withSourcesJar()
 }
+
+// Regressions that can be verified without a graphics context.
+tasks.withType(Test).configureEach { useJUnitPlatform() }
