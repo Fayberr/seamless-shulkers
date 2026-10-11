@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p run/mods
-          curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-ci" https://api.modrinth.com/v2/version/fEqsesPK > /tmp/litematica.json
+          curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-ci" https://api.modrinth.com/v2/version/ZqV316KY > /tmp/litematica.json
           curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-ci" 'https://api.modrinth.com/v2/project/malilib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22fabric%22%5D' > /tmp/malilib.json
           curl --retry 3 -fsSL "$(jq -r '[.files[] | select(.primary == true)][0].url' /tmp/litematica.json)" -o run/mods/litematica.jar
           curl --retry 3 -fsSL "$(jq -r '[.[0].files[] | select(.primary == true)][0].url' /tmp/malilib.json)" -o run/mods/malilib.jar

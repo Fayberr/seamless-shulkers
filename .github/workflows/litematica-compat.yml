@@ -12,11 +12,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-      - name: Fetch official Litematica 0.29.0
+      - name: Fetch official Litematica 0.29.1
         run: |
           set -euo pipefail
           curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-compat-test/0.1" \
-            "https://api.modrinth.com/v2/version/fEqsesPK" > /tmp/litematica-version.json
+            "https://api.modrinth.com/v2/version/ZqV316KY" > /tmp/litematica-version.json
           URL=$(jq -r '.files[] | select(.primary == true) | .url' /tmp/litematica-version.json | head -1)
           test -n "$URL"
           curl --retry 3 -fsSL "$URL" -o /tmp/litematica.jar
@@ -34,6 +34,6 @@ jobs:
           grep -n -E 'handleEasyPlace|schematicWorldPickBlock|getUsedHandForItem' /tmp/easyplace.txt || true
           echo "=== Hook assertion ==="
           if ! grep -q 'schematicWorldPickBlock' /tmp/worldutils.txt && ! grep -q 'schematicWorldPickBlock' /tmp/easyplace.txt; then
-            echo "No expected pick-block hook found in official Litematica 0.29.0."
+            echo "No expected pick-block hook found in official Litematica 0.29.1."
             exit 1
           fi

@@ -32,7 +32,7 @@ All GUI libraries are optional. To use Fayber's Modern Config UI, install compat
 
 - `gradle build` (Gradle 9.7.1 and JDK 25).
 - GitHub Actions `Build` compiles and publishes pre-release JARs.
-- `Litematica 26.3 Compatibility` downloads official Litematica 0.29.0 and checks its Easy Place bytecode entry points.
+- `Litematica 26.3 Compatibility` downloads official Litematica 0.29.1 and checks its Easy Place bytecode entry points.
 - `Dedicated Server Smoke` checks that the Fabric server boots with the server mixins loaded.
 - Follow [TESTING.md](TESTING.md) for the manual feature acceptance and item conservation checklist.
 
