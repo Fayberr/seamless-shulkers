@@ -37,7 +37,7 @@ public abstract class ContainerScreenMixin {
         if (event.shortcutKey() == 32 && ClientOptions.INSTANCE.tradingRefill
             && ((Object) this) instanceof MerchantScreen merchant
             && ClientPlayNetworking.canSend(TradeRefillRequest.TYPE)) {
-            ClientPlayNetworking.send(new TradeRefillRequest(merchant.getIndex()));
+            ClientPlayNetworking.send(new TradeRefillRequest(((MerchantScreenMixin) (Object) merchant).seamless$getSelectedOffer()));
         }
     }
 

@@ -6,6 +6,8 @@ import dev.fayber.seamless.StorageRequest;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.entity.player.Inventory;
@@ -46,16 +48,13 @@ public final class PreviewOverlay {
         if (!pinned && ClientOptions.INSTANCE.preferExternalTooltip &&
             FabricLoader.getInstance().isModLoaded("shulkerboxtooltip")) return;
         stacks = ShulkerStorage.read(box);
-        // Classic inventory palette with 9x3 item slots. No foreign renderer or source is copied.
-        graphics.fill(x, y, x + WIDTH, y + HEIGHT, 0xff171717);
-        graphics.fill(x + 1, y + 1, x + WIDTH - 1, y + HEIGHT - 1, 0xffc6c6c6);
-        graphics.fill(x + 2, y + 2, x + WIDTH - 2, y + 3, 0xffffffff);
+        // Original vanilla shulker box screen texture; implementation is entirely ours.
+        graphics.blit(RenderPipelines.GUI_TEXTURED,
+            Identifier.withDefaultNamespace("textures/gui/container/shulker_box.png"),
+            x, y, 0.0F, 0.0F, WIDTH, HEIGHT, 256, 256);
         graphics.text(mc.font, box.getHoverName(), x + 8, y + 6, 0xff404040, false);
         for (int i = 0; i < 27; i++) {
             int sx = x + FIRST_X + (i % 9) * CELL, sy = y + FIRST_Y + (i / 9) * CELL;
-            graphics.fill(sx, sy, sx + 18, sy + 18, 0xff373737);
-            graphics.fill(sx + 1, sy + 1, sx + 18, sy + 18, 0xffffffff);
-            graphics.fill(sx + 1, sy + 1, sx + 17, sy + 17, 0xff8b8b8b);
             ItemStack stack = stacks.get(i);
             if (!stack.isEmpty()) {
                 graphics.item(stack, sx + 1, sy + 1);
