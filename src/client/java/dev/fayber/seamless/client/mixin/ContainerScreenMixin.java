@@ -1,7 +1,8 @@
 package dev.fayber.seamless.client.mixin;
 
 import dev.fayber.seamless.client.PreviewOverlay;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
 import org.jetbrains.annotations.Nullable;
@@ -16,14 +17,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class ContainerScreenMixin {
     @Shadow @Nullable protected Slot hoveredSlot;
 
-    @Inject(method = "render", at = @At("TAIL"))
-    private void seamless$render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("TAIL"))
+    private void seamless$render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         PreviewOverlay.render(graphics, hoveredSlot, mouseX, mouseY);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void seamless$click(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
-        if (PreviewOverlay.click(mouseX, mouseY, button)) cir.setReturnValue(true);
+    private void seamless$click(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        if (PreviewOverlay.click(event.x(), event.y(), event.button() == 1 ? 0 : event.button() == 3 ? 1 : -1)) cir.setReturnValue(true);
     }
 
     @Inject(method = "removed", at = @At("HEAD"))

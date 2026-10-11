@@ -6,8 +6,7 @@ import dev.fayber.seamless.StorageRequest;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
@@ -21,11 +20,11 @@ public final class PreviewOverlay {
 
     private PreviewOverlay() {}
 
-    public static void render(GuiGraphics graphics, Slot hovered, int mouseX, int mouseY) {
+    public static void render(GuiGraphicsExtractor graphics, Slot hovered, int mouseX, int mouseY) {
         if (!ClientOptions.INSTANCE.preview) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        boolean alt = Screen.hasAltDown();
+        boolean alt = Minecraft.getInstance().hasAltDown();
         if (!alt) pinned = false;
         if (hovered != null && hovered.container instanceof Inventory inventory) {
             int slot = hovered.getContainerSlot();
@@ -51,7 +50,7 @@ public final class PreviewOverlay {
         graphics.fill(x, y, x + WIDTH, y + HEIGHT, 0xff171717);
         graphics.fill(x + 1, y + 1, x + WIDTH - 1, y + HEIGHT - 1, 0xffc6c6c6);
         graphics.fill(x + 2, y + 2, x + WIDTH - 2, y + 3, 0xffffffff);
-        graphics.drawString(mc.font, box.getHoverName(), x + 8, y + 6, 0xff404040, false);
+        graphics.text(mc.font, box.getHoverName(), x + 8, y + 6, 0xff404040, false);
         for (int i = 0; i < 27; i++) {
             int sx = x + FIRST_X + (i % 9) * CELL, sy = y + FIRST_Y + (i / 9) * CELL;
             graphics.fill(sx, sy, sx + 18, sy + 18, 0xff373737);
@@ -59,8 +58,8 @@ public final class PreviewOverlay {
             graphics.fill(sx + 1, sy + 1, sx + 17, sy + 17, 0xff8b8b8b);
             ItemStack stack = stacks.get(i);
             if (!stack.isEmpty()) {
-                graphics.renderItem(stack, sx + 1, sy + 1);
-                graphics.renderItemDecorations(mc.font, stack, sx + 1, sy + 1);
+                graphics.item(stack, sx + 1, sy + 1);
+                graphics.itemDecorations(mc.font, stack, sx + 1, sy + 1);
             }
             if (pinned && mouseX >= sx && mouseX < sx + 18 && mouseY >= sy && mouseY < sy + 18) {
                 graphics.fill(sx + 1, sy + 1, sx + 17, sy + 17, 0x80ffffff);
@@ -69,7 +68,7 @@ public final class PreviewOverlay {
     }
 
     public static boolean click(double mouseX, double mouseY, int button) {
-        if (!pinned || !Screen.hasAltDown() || !ClientOptions.INSTANCE.interactivePreview) return false;
+        if (!pinned || !Minecraft.getInstance().hasAltDown() || !ClientOptions.INSTANCE.interactivePreview) return false;
         if (mouseX < x || mouseX >= x + WIDTH || mouseY < y || mouseY >= y + HEIGHT) return false;
         int col = ((int) mouseX - x - FIRST_X) / CELL;
         int row = ((int) mouseY - y - FIRST_Y) / CELL;
