@@ -48,3 +48,12 @@ Use a disposable survival world and a fresh Fabric multiplayer test world. Recor
 - [ ] Inspect latest CI server-smoke logs for runtime mixin failures.
 
 **Release gate:** Do not label stable until tests above are verified and any failures fixed.
+
+## Tooltip overlay regression (alpha.3)
+
+- [ ] With Shulker Box Tooltip installed and preferred, normal Shift-hover still shows its full preview. Merely hovering without Shift should retain the regular item tooltip.
+- [ ] Press Left Alt with cursor over a carried shulker. The interactive vanilla-texture 9x3 panel should appear **in front** of Shulker Box Tooltip's preview; no blank tooltip state.
+- [ ] Press Alt while already holding Shift: the interactive panel must be visible, not obscured by the other mod's deferred tooltip.
+- [ ] Move cursor from shulker item into the pinned overlay with Alt held. Preview remains visible and clickable until Alt is released.
+- [ ] Set Prefer Shulker Box Tooltip OFF; our own hover preview should render even with the other mod installed.
+- [ ] Set Seamless Shulkers Preview OFF; normal vanilla / Shulker Box Tooltip remains fully functional.

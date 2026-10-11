@@ -2,7 +2,7 @@
 
 Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both client and dedicated-server functionality.
 
-**Status: pre-release (0.1.0-alpha.2).** CI compiles the mod and checks official Litematica bytecode compatibility. Multiplayer inventory conservation and in-game UI interactions still require hands-on verification before a stable release.
+**Status: pre-release (0.1.0-alpha.3).** CI compiles the mod and checks official Litematica bytecode compatibility. Multiplayer inventory conservation and in-game UI interactions still require hands-on verification before a stable release.
 
 ## Features
 
@@ -14,7 +14,7 @@ Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both clie
   - **OFF:** No special Litematica material supply.
 - **Trading:** Press **Space** in a villager screen to request missing payment items from carried shulkers for the selected offer.
 - **Client + Server:** Works in singleplayer using the integrated server. For multiplayer, install the **same JAR** on both the Fabric client and the dedicated Fabric server. On servers without it, the preview is display-only.
-- **Shulker Box Tooltip compatibility:** On normal hover, Shulker Box Tooltip remains in control when installed (and preferred). While hovering a carried shulker, press and hold **Left Alt** to pin the interactive Seamless Shulkers 27-slot preview. Its tooltip is suppressed for that frame so it cannot cover the clickable preview. Move the mouse into the pinned slots and release Alt to close it. No change to the other mod's configuration is required.
+- **Shulker Box Tooltip compatibility:** Normal hover remains under Shulker Box Tooltip's control when installed and preferred. Holding **Left Alt** over a carried shulker pins Seamless Shulkers' interactive 27-slot preview, which is drawn **after the deferred tooltip layer** rather than underneath it. Move the cursor into the pinned preview; release Alt to close it. No modification of the other mod's configuration is needed.
 - **Settings:** Modern Config + Modern GUI (preferred), otherwise Cloth Config, otherwise a minimal built-in screen. Both **Mod Menu**'s configuration button and the client command **`/seamlessshulkers`** use the same router and save into `config/seamless-shulkers.json`.
 
 ### Configuration libraries
