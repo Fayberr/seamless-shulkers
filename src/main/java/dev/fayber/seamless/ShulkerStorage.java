@@ -48,7 +48,9 @@ public final class ShulkerStorage {
         List<ItemStack> contents = read(shulker);
         ItemStack inside = contents.get(inner);
         ItemStack carried = player.containerMenu.getCarried();
-        int takeAmount = button == 1 ? (inside.getCount() + 1) / 2 : inside.getCount();
+        int takeAmount = StorageTransferAmounts.withdrawal(inside.getCount(), button);
+        SeamlessShulkers.LOGGER.debug("Preview transfer: slot {}, inside {}, button {}, stored {}, carried {}",
+                slot, inner, button, inside.getCount(), carried.getCount());
 
         if (carried.isEmpty() && !inside.isEmpty()) {
             ItemStack taken = inside.copyWithCount(takeAmount);

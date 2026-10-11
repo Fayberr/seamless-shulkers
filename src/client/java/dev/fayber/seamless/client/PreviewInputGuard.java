@@ -1,28 +1,29 @@
 package dev.fayber.seamless.client;
 
 /**
- * Pure input-capture state shared by preview mouse handlers.
- * A press consumed by the preview must consume its drag and release, even
- * if the user releases Alt between the press and mouse-button release.
+ * Minimal mouse press ownership. Only gestures starting in the preview
+ * are captured; outside clicks remain ordinary vanilla inventory clicks.
+ * Ownership persists if Alt is released or the pointer leaves the panel
+ * before the matching mouse button is released.
  */
 public final class PreviewInputGuard {
-    private boolean captured;
+    private int capturedButton = -1;
 
-    public boolean mousePressed(boolean modal) {
-        if (!modal) return false;
-        captured = true;
+    public boolean mousePressed(boolean locked, boolean insidePreview, int button) {
+        if (!locked || !insidePreview) return false;
+        capturedButton = button;
         return true;
     }
 
-    public boolean mouseDragged(boolean modal) {
-        return captured || modal;
+    public boolean mouseDragged(int button) {
+        return capturedButton == button;
     }
 
-    public boolean mouseReleased(boolean modal) {
-        boolean consume = captured || modal;
-        captured = false;
-        return consume;
+    public boolean mouseReleased(int button) {
+        if (capturedButton != button) return false;
+        capturedButton = -1;
+        return true;
     }
 
-    public void reset() { captured = false; }
+    public void reset() { capturedButton = -1; }
 }

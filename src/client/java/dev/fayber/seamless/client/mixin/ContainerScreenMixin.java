@@ -42,12 +42,12 @@ public abstract class ContainerScreenMixin {
     @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
     private void seamless$blockUnderlyingDrag(MouseButtonEvent event, double dragX, double dragY,
             CallbackInfoReturnable<Boolean> cir) {
-        if (PreviewOverlay.mouseDragged()) cir.setReturnValue(true);
+        if (PreviewOverlay.mouseDragged(event.button())) cir.setReturnValue(true);
     }
 
     @Inject(method = "mouseReleased", at = @At("HEAD"), cancellable = true)
     private void seamless$blockUnderlyingRelease(MouseButtonEvent event, CallbackInfoReturnable<Boolean> cir) {
-        if (PreviewOverlay.mouseReleased()) cir.setReturnValue(true);
+        if (PreviewOverlay.mouseReleased(event.button())) cir.setReturnValue(true);
     }
 
     @Inject(method = "keyPressed", at = @At("HEAD"))
