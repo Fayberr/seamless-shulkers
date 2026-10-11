@@ -33,7 +33,7 @@ public final class ShulkerStorage {
         return copies;
     }
 
-    private static void write(ItemStack shulker, List<ItemStack> items) {
+    static void write(ItemStack shulker, List<ItemStack> items) {
         shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
     }
 
