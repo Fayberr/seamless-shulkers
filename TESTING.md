@@ -8,7 +8,9 @@ Use a disposable survival world and a fresh Fabric multiplayer test world. Recor
 - [ ] Hold Alt over the shulker, move cursor to preview, pick up stacks (left click), half stacks (right click), insert and merge stacks, release Alt. Nothing is lost or duplicated.
 - [ ] Move shulker mid-interaction; ensure the server rejects stale slots rather than moving items from the wrong box.
 - [ ] Leave an item on the cursor while releasing Alt; it remains available.
-- [ ] With Shulker Box Tooltip also installed, ordinary hover displays a **single** preview; Alt uses Seamless Shulkers' interactive one.
+- [ ] With Shulker Box Tooltip 5.4.2 (26.3) installed, normal Shift hover is handled by that mod; hold Left Alt (with or without Shift) directly over the box to replace the deferred tooltip with the clickable Seamless Shulkers inventory. No overlap or underlying tooltip should cover the panel.
+- [ ] Continue holding Alt while moving the cursor into the 27 slots: the panel must remain fixed. Click both mouse buttons; then release Alt, confirm the preview disappears and regular Shulker Box Tooltip resumes.
+- [ ] Toggle "Prefer Shulker Box Tooltip" off: only Seamless Shulkers preview appears on hover (with or without the other mod installed).
 
 ## Litematica Easy Place
 
