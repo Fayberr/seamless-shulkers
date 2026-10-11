@@ -27,7 +27,12 @@ public final class ClientOptions {
         try {
             if (Files.exists(PATH)) {
                 ClientOptions options = GSON.fromJson(Files.readString(PATH, StandardCharsets.UTF_8), ClientOptions.class);
-                if (options != null) return options;
+                if (options != null) {
+                    if (options.easyPlaceMode == null) options.easyPlaceMode = EasyPlaceMode.DIRECT;
+                    options.refillAtOrBelow = Math.max(0, Math.min(63, options.refillAtOrBelow));
+                    options.refillUpTo = Math.max(1, Math.min(64, options.refillUpTo));
+                    return options;
+                }
             }
         } catch (Exception ignored) {}
         return new ClientOptions();
