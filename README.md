@@ -7,7 +7,7 @@ Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both clie
 ## Features
 
 - **27-slot Shulker Preview:** Vanilla-style inventory texture. Hold **Alt** while hovering a carried shulker to pin the preview and pick up/place item stacks. Release Alt to close it.
-- **Auto-Refill:** Refills the selected hotbar stack from carried shulkers when its count drops below a configured threshold.
+- **Auto-Refill:** Optional (off by default) refill of the selected hotbar stack from carried shulkers when its count drops below a configured threshold. This independent setting does not override the selected Easy Place supply mode.
 - **Easy Place Supply Modes:**
   - **DIRECT (default):** Optional integration with Litematica 26.3. When Litematica needs an item absent from the normal inventory, a one-item virtual hand use temporarily supplies it from a carried shulker. Vanilla executes placement with Litematica's chosen hit target, then the server deducts exactly the block that vanilla consumed. Nothing remains in the player's inventory.
   - **INVENTORY_REFILL:** Requests the needed block from a carried shulker into a free hotbar slot. A second Easy Place use may be necessary after network latency.

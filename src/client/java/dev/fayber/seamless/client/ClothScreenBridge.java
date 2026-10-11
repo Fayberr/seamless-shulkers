@@ -33,7 +33,7 @@ public final class ClothScreenBridge {
                 .setTooltip(Component.literal("DIRECT uses one item from the shulker for each placement. INVENTORY_REFILL moves stacks into free hotbar slots."))
                 .setSaveConsumer(value -> c.easyPlaceMode = value).build());
         building.addEntry(eb.startBooleanToggle(Component.literal("Automatic selected-slot refill"), c.hotbarRefill)
-                .setDefaultValue(true).setSaveConsumer(value -> c.hotbarRefill = value).build());
+                .setDefaultValue(false).setSaveConsumer(value -> c.hotbarRefill = value).build());
         building.addEntry(eb.startIntSlider(Component.literal("Refill when count is at most"), c.refillAtOrBelow, 0, 63)
                 .setDefaultValue(8).setSaveConsumer(value -> c.refillAtOrBelow = value).build());
         building.addEntry(eb.startIntSlider(Component.literal("Refill up to"), c.refillUpTo, 1, 64)

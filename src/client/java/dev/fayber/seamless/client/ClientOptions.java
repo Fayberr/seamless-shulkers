@@ -10,7 +10,7 @@ import net.fabricmc.loader.api.FabricLoader;
 public final class ClientOptions {
     public boolean preview = true;
     public boolean interactivePreview = true;
-    public boolean hotbarRefill = true;
+    public boolean hotbarRefill = false;
     public int refillAtOrBelow = 8;
     public int refillUpTo = 64;
     public boolean preferExternalTooltip = true;
