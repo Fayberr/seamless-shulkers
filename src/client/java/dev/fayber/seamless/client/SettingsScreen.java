@@ -36,11 +36,21 @@ public final class SettingsScreen extends Screen {
                 button.setMessage(Component.literal("Refill target: " + options.refillUpTo));
             }).bounds(x, y + 138, 230, 20).build());
 
+        this.addRenderableWidget(Button.builder(Component.literal("Easy Place: " + options.easyPlaceMode),
+            button -> {
+                options.easyPlaceMode = switch(options.easyPlaceMode) {
+                    case DIRECT -> ClientOptions.EasyPlaceMode.INVENTORY_REFILL;
+                    case INVENTORY_REFILL -> ClientOptions.EasyPlaceMode.OFF;
+                    case OFF -> ClientOptions.EasyPlaceMode.DIRECT;
+                };
+                button.setMessage(Component.literal("Easy Place: " + options.easyPlaceMode));
+            }).bounds(x, y + 161, 230, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Save and close"),
             button -> {
                 options.save();
                 this.minecraft.gui.setScreen(parent);
-            }).bounds(x, y + 165, 230, 20).build());
+            }).bounds(x, y + 184, 230, 20).build());
     }
 
     private void addBoolean(int x, int y, String title,
