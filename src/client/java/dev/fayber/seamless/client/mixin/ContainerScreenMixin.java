@@ -27,6 +27,11 @@ public abstract class ContainerScreenMixin {
         PreviewOverlay.render(graphics, hoveredSlot, mouseX, mouseY);
     }
 
+    @Inject(method = "extractTooltip", at = @At("HEAD"), cancellable = true)
+    private void seamless$hideUnderlyingTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY, CallbackInfo ci) {
+        if (PreviewOverlay.isPinned()) ci.cancel();
+    }
+
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void seamless$click(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
         if (PreviewOverlay.click(event.x(), event.y(), event.button() == 1 ? 0 : event.button() == 3 ? 1 : -1)) cir.setReturnValue(true);
