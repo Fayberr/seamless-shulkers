@@ -29,7 +29,14 @@ jobs:
           curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-ci" 'https://api.modrinth.com/v2/project/malilib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22fabric%22%5D' > /tmp/malilib.json
           curl --retry 3 -fsSL "$(jq -r '[.files[] | select(.primary == true)][0].url' /tmp/litematica.json)" -o run/mods/litematica.jar
           curl --retry 3 -fsSL "$(jq -r '[.[0].files[] | select(.primary == true)][0].url' /tmp/malilib.json)" -o run/mods/malilib.jar
-      - name: Launch Fabric client with optional Litematica
+      - name: Fetch Shulker Box Tooltip 26.3 (compatibility regression)
+        run: |
+          set -euo pipefail
+          curl --retry 3 -fsSL -H 'User-Agent: seamless-shulkers-ci' \
+            https://api.modrinth.com/v2/version/Cj9VEeGt > /tmp/sbt.json
+          curl --retry 3 -fsSL "$(jq -r '[.files[] | select(.primary == true)][0].url' /tmp/sbt.json)" \
+            -o run/mods/shulkerboxtooltip.jar
+      - name: Launch Fabric client with Litematica and Shulker Box Tooltip
         run: |
           set -euo pipefail
           sudo apt-get update -qq
