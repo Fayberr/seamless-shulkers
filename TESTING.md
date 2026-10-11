@@ -57,3 +57,16 @@ Use a disposable survival world and a fresh Fabric multiplayer test world. Recor
 - [ ] Move cursor from shulker item into the pinned overlay with Alt held. Preview remains visible and clickable until Alt is released.
 - [ ] Set Prefer Shulker Box Tooltip OFF; our own hover preview should render even with the other mod installed.
 - [ ] Set Seamless Shulkers Preview OFF; normal vanilla / Shulker Box Tooltip remains fully functional.
+
+## Interactive preview mouse isolation and SBT-style design (alpha.4)
+
+- [ ] When Shulker Box Tooltip is present, Shift-hover keeps showing its normal compact tooltip.
+- [ ] With only Seamless Shulkers, ordinary hover shows a compact, dark item-tooltip window with name, item preview, registry ID, component count, stack count and Alt hint.
+- [ ] Alt pins the full 9x3 grid with a tooltip-like purple border. Its position should remain near the hovered shulker; it must not always be anchored to the bottom of the screen.
+- [ ] Put exactly 46 arrows into a shulker. Hold Alt, **left-click** arrows once; all 46 appear on the cursor, and the shulker slot empties. Neither an inventory slot behind the preview nor an adjacent slot is modified.
+- [ ] Put exactly 46 arrows back. Hold Alt, **right-click** once; 23 arrows move to the cursor and 23 remain in the shulker.
+- [ ] While holding Alt, move the mouse while still holding a mouse button, then release above an inventory slot behind the tooltip; no items transfer there.
+- [ ] Start clicking a tooltip slot, release Alt before releasing the mouse button; the underlying inventory must still ignore that release.
+- [ ] Release Alt without holding a mouse button and then left-click a normal inventory slot; the carried items can be deposited normally.
+- [ ] Rapidly repeat transfers with lag, a full inventory, a partly occupied cursor stack, and multiple equal-looking shulkers. Verify total item conservation.
+- [ ] A preview interaction must not trigger Quick Craft / slot-drag mechanics in the underlying container.

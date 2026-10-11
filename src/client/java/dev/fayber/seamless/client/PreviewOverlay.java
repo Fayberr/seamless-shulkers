@@ -160,10 +160,8 @@ public final class PreviewOverlay {
             }
         }
 
-        // Empty slots in the full interactive grid still need visible cells.
-        if (pinned) {
-            // The loop above already draws all 27 slots, including empty ones.
-        } else if (rendered == 0) {
+        // The interactive loop already draws empty slots in all 27 positions.
+        if (!pinned && rendered == 0) {
             drawSlot(graphics, x + GRID_X, y + GRID_Y);
         }
 
