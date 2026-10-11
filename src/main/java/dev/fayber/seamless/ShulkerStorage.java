@@ -10,6 +10,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.MerchantMenu;
+import net.minecraft.world.item.trading.ItemCost;
+import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 
@@ -73,6 +76,51 @@ public final class ShulkerStorage {
         write(shulker, contents);
         player.getInventory().setChanged();
         player.containerMenu.broadcastChanges();
+    }
+
+    // Server-authoritative Space trading refills. The client supplies only the selected offer index.
+    public static void handleTradeRefill(ServerPlayer player, TradeRefillRequest packet) {
+        if (!(player.containerMenu instanceof MerchantMenu menu)) return;
+        if (packet.offerIndex() < 0 || packet.offerIndex() >= menu.getOffers().size()) return;
+        if (!menu.stillValid(player)) return;
+        MerchantOffer offer = menu.getOffers().get(packet.offerIndex());
+        if (offer.isOutOfStock()) return;
+        menu.setSelectionHint(packet.offerIndex());
+        fillTradePayment(player, menu, offer.getItemCostA(), 0);
+        offer.getItemCostB().ifPresent(cost -> fillTradePayment(player, menu, cost, 1));
+        menu.updateSellItem();
+        player.getInventory().setChanged();
+        menu.broadcastChanges();
+    }
+
+    private static void fillTradePayment(ServerPlayer player, MerchantMenu menu, ItemCost cost, int paymentSlot) {
+        ItemStack payment = menu.getSlot(paymentSlot).getItem();
+        if (!payment.isEmpty() && !cost.test(payment)) return;
+        boolean changed = false;
+        for (int source = 0; source < 36; source++) {
+            ItemStack shulker = player.getInventory().getItem(source);
+            if (!isShulker(shulker)) continue;
+            List<ItemStack> items = read(shulker);
+            boolean sourceChanged = false;
+            for (int inner = 0; inner < 27; inner++) {
+                ItemStack stored = items.get(inner);
+                if (stored.isEmpty() || !cost.test(stored)) continue;
+                if (!payment.isEmpty() && !ItemStack.isSameItemSameComponents(payment, stored)) continue;
+                int room = (payment.isEmpty() ? stored.getMaxStackSize() : payment.getMaxStackSize()) - payment.getCount();
+                if (room <= 0) break;
+                int amount = Math.min(room, stored.getCount());
+                if (amount <= 0) continue;
+                if (payment.isEmpty()) payment = stored.copyWithCount(amount);
+                else payment.grow(amount);
+                stored.shrink(amount);
+                items.set(inner, stored.isEmpty() ? ItemStack.EMPTY : stored);
+                sourceChanged = true;
+                changed = true;
+            }
+            if (sourceChanged) write(shulker, items);
+            if (!payment.isEmpty() && payment.getCount() >= payment.getMaxStackSize()) break;
+        }
+        if (changed) menu.getSlot(paymentSlot).set(payment);
     }
 
     // Refills only an empty or matching main-inventory stack. Never overwrites user items.
