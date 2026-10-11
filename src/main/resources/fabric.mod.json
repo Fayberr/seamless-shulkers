@@ -20,6 +20,7 @@
     ]
   },
   "mixins": [
+    "seamlessshulkers.mixins.json",
     {
       "config": "seamlessshulkers.client.mixins.json",
       "environment": "client"

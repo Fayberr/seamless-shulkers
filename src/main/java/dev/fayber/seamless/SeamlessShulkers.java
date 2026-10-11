@@ -15,12 +15,15 @@ public final class SeamlessShulkers implements ModInitializer {
         PayloadTypeRegistry.serverboundPlay().register(StorageRequest.TYPE, StorageRequest.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(RefillRequest.TYPE, RefillRequest.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(TradeRefillRequest.TYPE, TradeRefillRequest.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(DirectArmRequest.TYPE, DirectArmRequest.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(StorageRequest.TYPE, (payload, context) ->
             context.server().execute(() -> ShulkerStorage.handleStorage(context.player(), payload)));
         ServerPlayNetworking.registerGlobalReceiver(RefillRequest.TYPE, (payload, context) ->
             context.server().execute(() -> ShulkerStorage.handleRefill(context.player(), payload)));
         ServerPlayNetworking.registerGlobalReceiver(TradeRefillRequest.TYPE, (payload, context) ->
             context.server().execute(() -> ShulkerStorage.handleTradeRefill(context.player(), payload)));
+        ServerPlayNetworking.registerGlobalReceiver(DirectArmRequest.TYPE, (payload, context) ->
+            context.server().execute(() -> DirectPlacementServer.arm(context.player(), payload)));
         LOGGER.info("Seamless Shulkers server storage handlers ready");
     }
 }
