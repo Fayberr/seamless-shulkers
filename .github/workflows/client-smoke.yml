@@ -1,0 +1,49 @@
+name: Client Boot Smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/client-smoke.yml'
+  workflow_dispatch:
+jobs:
+  fabric-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.1'
+      - name: Get Litematica and MaLiLib 26.3
+        run: |
+          set -euo pipefail
+          mkdir -p run/mods
+          curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-ci" https://api.modrinth.com/v2/version/fEqsesPK > /tmp/litematica.json
+          curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-ci" 'https://api.modrinth.com/v2/project/malilib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22fabric%22%5D' > /tmp/malilib.json
+          curl --retry 3 -fsSL "$(jq -r '[.files[] | select(.primary == true)][0].url' /tmp/litematica.json)" -o run/mods/litematica.jar
+          curl --retry 3 -fsSL "$(jq -r '[.[0].files[] | select(.primary == true)][0].url' /tmp/malilib.json)" -o run/mods/malilib.jar
+      - name: Launch Fabric client with optional Litematica
+        run: |
+          set -euo pipefail
+          command -v xvfb-run >/dev/null || (sudo apt-get update && sudo apt-get install -y xvfb)
+          set +e
+          timeout 130s xvfb-run -a gradle --no-daemon runClient > /tmp/client.log 2>&1
+          code=$?
+          set -e
+          tail -n 180 /tmp/client.log
+          if grep -Eqi 'MixinApplyError|InjectionError|MixinTransformerError|Failed to launch|Crash report|Could not initialize class' /tmp/client.log; then
+            echo "Fatal client or mixin initialization error."
+            exit 1
+          fi
+          if ! grep -q "Seamless Shulkers server storage handlers ready" /tmp/client.log; then
+            echo "Seamless Shulkers initializer was not observed (exit $code)."
+            exit 1
+          fi
+          echo "Client initialization reached. Full manual GUI and placement tests still required."
