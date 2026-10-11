@@ -2,6 +2,12 @@
   "required": true,
   "package": "dev.fayber.seamless.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "mixins": ["ContainerScreenMixin", "MerchantScreenMixin"],
-  "injectors": {"defaultRequire": 1}
+  "mixins": [
+    "ContainerScreenMixin",
+    "MerchantScreenMixin",
+    "LitematicaPickMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }
