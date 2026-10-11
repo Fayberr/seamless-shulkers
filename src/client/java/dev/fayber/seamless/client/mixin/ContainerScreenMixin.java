@@ -23,8 +23,8 @@ public abstract class ContainerScreenMixin {
     @Shadow @Nullable protected Slot hoveredSlot;
 
     @Inject(method = "extractRenderState", at = @At("TAIL"))
-    private void seamless$render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
-        PreviewOverlay.render(graphics, hoveredSlot, mouseX, mouseY);
+    private void seamless$updatePreview(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        PreviewOverlay.update(hoveredSlot, mouseX, mouseY);
     }
 
     @Inject(method = "extractTooltip", at = @At("HEAD"), cancellable = true)

@@ -8,7 +8,8 @@
     "LitematicaPickMixin",
     "LitematicaLegacyDirectMixin",
     "LitematicaRewriteDirectMixin",
-    "ClientUseOnMixin"
+    "ClientUseOnMixin",
+    "ScreenTooltipLayerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
