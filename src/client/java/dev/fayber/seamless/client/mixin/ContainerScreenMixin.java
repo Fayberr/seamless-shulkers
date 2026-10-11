@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(AbstractContainerScreen.class)
+@Mixin(value = AbstractContainerScreen.class, priority = 1500)
 public abstract class ContainerScreenMixin {
     @Shadow @Nullable protected Slot hoveredSlot;
 
@@ -29,7 +29,9 @@ public abstract class ContainerScreenMixin {
 
     @Inject(method = "extractTooltip", at = @At("HEAD"), cancellable = true)
     private void seamless$hideUnderlyingTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY, CallbackInfo ci) {
-        if (PreviewOverlay.isPinned()) ci.cancel();
+        // Called before vanilla queues a deferred tooltip (and before SBT wraps it).
+        // Update the hovered shulker now, not at extractRenderState TAIL.
+        if (PreviewOverlay.interceptTooltip(hoveredSlot, mouseX, mouseY)) ci.cancel();
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)

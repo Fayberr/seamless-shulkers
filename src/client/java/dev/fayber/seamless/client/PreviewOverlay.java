@@ -23,31 +23,61 @@ public final class PreviewOverlay {
 
     private PreviewOverlay() {}
 
-    public static void render(GuiGraphicsExtractor graphics, Slot hovered, int mouseX, int mouseY) {
-        if (!ClientOptions.INSTANCE.preview) return;
+    /**
+     * Run BEFORE vanilla extractTooltip queues its deferred tooltip.
+     *
+     * AbstractContainerScreen.extractRenderState does:
+     * extractContents -> extractCarriedItem -> extractTooltip -> return.
+     * Setting pinned only at extractRenderState TAIL is too late to suppress
+     * the tooltip from Shulker Box Tooltip: it will already be queued on top.
+     */
+    public static void update(Slot hovered, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
-        boolean alt = Minecraft.getInstance().hasAltDown();
+        if (!ClientOptions.INSTANCE.preview || mc.player == null) {
+            clear();
+            return;
+        }
+
+        boolean alt = mc.hasAltDown();
         if (!alt) pinned = false;
         if (hovered != null && hovered.container instanceof Inventory inventory) {
             int slot = hovered.getContainerSlot();
             if (slot >= 0 && slot < 36 && ShulkerStorage.isShulker(inventory.getItem(slot))) {
                 if (!pinned) {
                     shulkerSlot = slot;
-                    x = Math.min(mouseX + 12, mc.getWindow().getGuiScaledWidth() - WIDTH - 4);
-                    y = Math.min(mouseY + 12, mc.getWindow().getGuiScaledHeight() - HEIGHT - 4);
+                    x = Math.max(4, Math.min(mouseX + 12, mc.getWindow().getGuiScaledWidth() - WIDTH - 4));
+                    y = Math.max(4, Math.min(mouseY + 12, mc.getWindow().getGuiScaledHeight() - HEIGHT - 4));
                 }
                 if (alt && ClientOptions.INSTANCE.interactivePreview) pinned = true;
             } else if (!pinned) shulkerSlot = -1;
         } else if (!pinned) shulkerSlot = -1;
 
-        if (shulkerSlot < 0) return;
-        ItemStack box = mc.player.getInventory().getItem(shulkerSlot);
-        if (!ShulkerStorage.isShulker(box)) { shulkerSlot = -1; pinned = false; return; }
+        if (shulkerSlot >= 0 && !ShulkerStorage.isShulker(mc.player.getInventory().getItem(shulkerSlot))) {
+            clear();
+        }
+    }
 
-        // Respect external tooltip mods for ordinary hover; interactive Alt overlay stays ours.
+    /**
+     * Suppress the underlying item tooltip when our own 27-slot overlay is visible.
+     * Normal hovering still belongs to Shulker Box Tooltip if the user prefers it.
+     */
+    public static boolean interceptTooltip(Slot hovered, int mouseX, int mouseY) {
+        update(hovered, mouseX, mouseY);
+        if (shulkerSlot < 0) return false;
+        if (pinned) return true;
+        return !ClientOptions.INSTANCE.preferExternalTooltip
+                || !FabricLoader.getInstance().isModLoaded("shulkerboxtooltip");
+    }
+
+    public static void render(GuiGraphicsExtractor graphics, Slot hovered, int mouseX, int mouseY) {
+        // extractTooltip is usually invoked earlier in the same render pass.
+        // Update defensively for container screens with custom render sequences.
+        update(hovered, mouseX, mouseY);
+        if (shulkerSlot < 0) return;
+        Minecraft mc = Minecraft.getInstance();
+        ItemStack box = mc.player.getInventory().getItem(shulkerSlot);
         if (!pinned && ClientOptions.INSTANCE.preferExternalTooltip &&
-            FabricLoader.getInstance().isModLoaded("shulkerboxtooltip")) return;
+                FabricLoader.getInstance().isModLoaded("shulkerboxtooltip")) return;
         stacks = ShulkerStorage.read(box);
         // Original vanilla shulker box screen texture; implementation is entirely ours.
         graphics.blit(RenderPipelines.GUI_TEXTURED,
