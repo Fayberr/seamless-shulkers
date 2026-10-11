@@ -34,7 +34,7 @@ public abstract class ContainerScreenMixin {
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void seamless$click(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
-        if (PreviewOverlay.click(event.x(), event.y(), event.button() == 1 ? 0 : event.button() == 3 ? 1 : -1)) cir.setReturnValue(true);
+        if (PreviewOverlay.click(event.x(), event.y(), event.button())) cir.setReturnValue(true);
     }
 
     @Inject(method = "keyPressed", at = @At("HEAD"))

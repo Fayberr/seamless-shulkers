@@ -61,7 +61,16 @@ public final class ShulkerStorage {
                 moved = button == 1 ? 1 : Math.min(carried.getCount(), carried.getMaxStackSize());
                 contents.set(inner, carried.copyWithCount(moved));
             } else {
-                if (!ItemStack.isSameItemSameComponents(inside, carried)) return;
+                if (!ItemStack.isSameItemSameComponents(inside, carried)) {
+                    // Vanilla left-click swaps two unlike stacks; right-click does nothing.
+                    if (button != 0) return;
+                    contents.set(inner, carried.copy());
+                    player.containerMenu.setCarried(inside.copy());
+                    write(shulker, contents);
+                    player.getInventory().setChanged();
+                    player.containerMenu.broadcastChanges();
+                    return;
+                }
                 moved = Math.min(button == 1 ? 1 : carried.getCount(), inside.getMaxStackSize() - inside.getCount());
                 if (moved <= 0) return;
                 inside.grow(moved);
