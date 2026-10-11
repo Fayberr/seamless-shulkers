@@ -12,7 +12,7 @@ Use a disposable survival world and a fresh Fabric multiplayer test world. Recor
 
 ## Litematica Easy Place
 
-- [ ] On the official Litematica 0.29.0 (Minecraft 26.3) with MaLiLib, enable Easy Place, set the Seamless Shulkers supply mode to DIRECT.
+- [ ] On the official Litematica 0.29.1 (Minecraft 26.3) with MaLiLib 0.30.2, enable Easy Place, set the Seamless Shulkers supply mode to DIRECT.
 - [ ] Carry one shulker containing several block types, including stairs, slabs, logs, signs and blocks with specific item components; keep matching blocks out of normal inventory.
 - [ ] Look at each block in an active schematic and use Easy Place: it should use one item from the right shulker slot, preserve orientations that Easy Place normally handles, and leave the player's original hotbar untouched.
 - [ ] Right-click an adjacent interactable block. Confirm no unrelated interactions or accidental extra placements.

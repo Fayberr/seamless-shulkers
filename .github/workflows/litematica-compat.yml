@@ -2,6 +2,9 @@ name: Litematica 26.3 Compatibility
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/litematica-compat.yml'
   workflow_dispatch:
 jobs:
   inspect-litematica:

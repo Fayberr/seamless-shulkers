@@ -2,6 +2,11 @@ name: Dedicated Server Smoke
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/server-smoke.yml'
   workflow_dispatch:
 jobs:
   fabric-server:
