@@ -31,7 +31,7 @@ public abstract class LitematicaPickMixin {
     private static void seamless$prepareMissingItem(ItemStack required, BlockPos pos, Level schematicWorld,
                                                      Minecraft client, CallbackInfo ci) {
         if (!FabricLoader.getInstance().isModLoaded("litematica")
-                || !ClientOptions.INSTANCE.hotbarRefill || required.isEmpty()
+                || (ClientOptions.INSTANCE.easyPlaceMode != ClientOptions.EasyPlaceMode.INVENTORY_REFILL) || required.isEmpty()
                 || client.player == null || !ClientPlayNetworking.canSend(RefillRequest.TYPE)) return;
 
         // Let normal Litematica item picking operate if the required block is already carried.

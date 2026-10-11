@@ -4,14 +4,26 @@
   "version": "${version}",
   "name": "Seamless Shulkers",
   "description": "Interactive carried-shulker storage and inventory refills.",
-  "authors": ["Fayberr"],
+  "authors": [
+    "Fayberr"
+  ],
   "environment": "*",
   "entrypoints": {
-    "main": ["dev.fayber.seamless.SeamlessShulkers"],
-    "client": ["dev.fayber.seamless.client.SeamlessShulkersClient"]
+    "main": [
+      "dev.fayber.seamless.SeamlessShulkers"
+    ],
+    "client": [
+      "dev.fayber.seamless.client.SeamlessShulkersClient"
+    ],
+    "modmenu": [
+      "dev.fayber.seamless.client.ModMenuIntegration"
+    ]
   },
   "mixins": [
-    { "config": "seamlessshulkers.client.mixins.json", "environment": "client" }
+    {
+      "config": "seamlessshulkers.client.mixins.json",
+      "environment": "client"
+    }
   ],
   "depends": {
     "fabricloader": ">=0.19.5",
@@ -22,6 +34,9 @@
   "suggests": {
     "modernconfig": "*",
     "shulkerboxtooltip": "*",
-    "litematica": "*"
+    "litematica": "*",
+    "modmenu": "*",
+    "cloth-config": "*",
+    "moderngui": "*"
   }
 }

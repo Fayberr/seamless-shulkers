@@ -15,8 +15,9 @@ public final class ClientOptions {
     public int refillUpTo = 64;
     public boolean preferExternalTooltip = true;
     public boolean tradingRefill = true;
-    // Direct schematic placement requires its own integration, not a refill toggle.
-    public boolean directSchematicPlacement = false;
+    public enum EasyPlaceMode { DIRECT, INVENTORY_REFILL, OFF }
+    public EasyPlaceMode easyPlaceMode = EasyPlaceMode.DIRECT;
+    public boolean safeDirectPlacement = true;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("seamless-shulkers.json");
@@ -32,6 +33,9 @@ public final class ClientOptions {
         return new ClientOptions();
     }
     public void save() {
+        refillAtOrBelow = Math.max(0, Math.min(63, refillAtOrBelow));
+        refillUpTo = Math.max(1, Math.min(64, refillUpTo));
+        if (easyPlaceMode == null) easyPlaceMode = EasyPlaceMode.DIRECT;
         try {
             Files.createDirectories(PATH.getParent());
             Files.writeString(PATH, GSON.toJson(this), StandardCharsets.UTF_8);

@@ -20,7 +20,7 @@ public final class SeamlessShulkersClient implements ClientModInitializer {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
             dispatcher.register(literal("seamlessshulkers").executes(ctx -> {
                 Minecraft mc = Minecraft.getInstance();
-                mc.execute(() -> mc.gui.setScreen(new SettingsScreen(mc.gui.screen())));
+                mc.execute(() -> mc.gui.setScreen(ConfigScreenRouter.create(mc.gui.screen())));
                 return 1;
             })));
     }
