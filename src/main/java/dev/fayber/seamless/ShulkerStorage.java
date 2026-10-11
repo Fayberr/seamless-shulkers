@@ -60,7 +60,7 @@ public final class ShulkerStorage {
         } else if (!carried.isEmpty() && !isShulker(carried)) {
             int moved;
             if (inside.isEmpty()) {
-                moved = button == 1 ? 1 : Math.min(carried.getCount(), carried.getMaxStackSize());
+                moved = StorageTransferAmounts.deposit(carried.getCount(), 0, carried.getMaxStackSize(), button);
                 contents.set(inner, carried.copyWithCount(moved));
             } else {
                 if (!ItemStack.isSameItemSameComponents(inside, carried)) {
@@ -73,7 +73,7 @@ public final class ShulkerStorage {
                     player.containerMenu.broadcastChanges();
                     return;
                 }
-                moved = Math.min(button == 1 ? 1 : carried.getCount(), inside.getMaxStackSize() - inside.getCount());
+                moved = StorageTransferAmounts.deposit(carried.getCount(), inside.getCount(), inside.getMaxStackSize(), button);
                 if (moved <= 0) return;
                 inside.grow(moved);
                 contents.set(inner, inside);

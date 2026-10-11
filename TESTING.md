@@ -70,3 +70,14 @@ Use a disposable survival world and a fresh Fabric multiplayer test world. Recor
 - [ ] Release Alt without holding a mouse button and then left-click a normal inventory slot; the carried items can be deposited normally.
 - [ ] Rapidly repeat transfers with lag, a full inventory, a partly occupied cursor stack, and multiple equal-looking shulkers. Verify total item conservation.
 - [ ] A preview interaction must not trigger Quick Craft / slot-drag mechanics in the underlying container.
+
+## Mouse/inventory interaction regression (alpha.5)
+
+- [ ] With Shulker Box Tooltip installed, hovering and Shift preview are unchanged without Alt.
+- [ ] Without Shulker Box Tooltip, Shift displays a compact item preview using vanilla tooltip background and 24px slot sprites.
+- [ ] With 46 arrows in a shulker slot and an empty cursor, hold Alt and LEFT-click it: the full 46 must move to the cursor, with the box slot empty. After that, while still holding Alt, click an ordinary inventory slot OUTSIDE the preview: all 46 must be deposited there.
+- [ ] With 46 arrows in the box and empty cursor, hold Alt and RIGHT-click: 23 must move to the cursor.
+- [ ] With 12 arrows on cursor and 17 in the box, LEFT-click the preview stack: cursor empties, destination becomes 29. RIGHT-click instead: cursor becomes 11 and box becomes 18; this matches normal Minecraft controls.
+- [ ] Press inside preview, drag over an inventory slot and release: no underlying slot may be accidentally clicked.
+- [ ] Start click in normal inventory OUTSIDE the pinned preview and release normally: vanilla still handles the interaction.
+- [ ] While holding Alt, click another inventory stack OUTSIDE the preview, and then place it into an empty slot INSIDE the preview.

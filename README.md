@@ -2,11 +2,11 @@
 
 Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both client and dedicated-server functionality.
 
-**Status: pre-release (0.1.0-alpha.4).** CI compiles the mod and checks official Litematica bytecode compatibility. Multiplayer inventory conservation and in-game UI interactions still require hands-on verification before a stable release.
+**Status: pre-release (0.1.0-alpha.5).** CI compiles the mod and checks official Litematica bytecode compatibility. Multiplayer inventory conservation and in-game UI interactions still require hands-on verification before a stable release.
 
 ## Features
 
-- **Shulker preview and interaction:** Compact item-tooltip preview when Shulker Box Tooltip is absent (or when Seamless Shulkers' own preview is preferred). Hold **Left Alt** over a carried shulker to pin the full 9x3 tooltip-style inventory. Left-click collects an entire stack; right-click takes the larger half. Alt-held preview clicks, drags and releases are isolated from the inventory underneath. Release Alt to dismiss, then click the normal inventory to deposit carried items.
+- **Shulker Box Tooltip-compatible preview:** Normal hover is left entirely to Shulker Box Tooltip, if installed. Otherwise normal vanilla tooltip remains available; hold **Shift** to preview the contents in compact form. Hold **Left Alt** over a carried shulker to lock a complete, native-tooltip-style 9x3 preview and access its slots. While Alt remains held, **click outside the preview to interact with your ordinary inventory**. The tooltip uses Minecraft's own tooltip background and bundle slot sprites, not a custom gray inventory window. The renderer is a greenfield implementation and does not copy Shulker Box Tooltip source.
 - **Auto-Refill:** Optional (off by default) refill of the selected hotbar stack from carried shulkers when its count drops below a configured threshold. This independent setting does not override the selected Easy Place supply mode.
 - **Easy Place Supply Modes:**
   - **DIRECT (default):** Optional integration with Litematica 26.3. When Litematica needs an item absent from the normal inventory, a one-item virtual hand use temporarily supplies it from a carried shulker. Vanilla executes placement with Litematica's chosen hit target, then the server deducts exactly the block that vanilla consumed. Nothing remains in the player's inventory.
@@ -14,12 +14,26 @@ Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both clie
   - **OFF:** No special Litematica material supply.
 - **Trading:** Press **Space** in a villager screen to request missing payment items from carried shulkers for the selected offer.
 - **Client + Server:** Works in singleplayer using the integrated server. For multiplayer, install the **same JAR** on both the Fabric client and the dedicated Fabric server. On servers without it, the preview is display-only.
-- **Shulker Box Tooltip compatibility:** Normal hover remains under Shulker Box Tooltip's control when installed and preferred. Holding **Left Alt** over a carried shulker pins Seamless Shulkers' interactive 27-slot preview, which is drawn **after the deferred tooltip layer** rather than underneath it. Move the cursor into the pinned preview; release Alt to close it. No modification of the other mod's configuration is needed.
+- **Shulker Box Tooltip compatibility:** Shift and other non-Alt controls continue to work normally when that mod is installed. Alt activates Seamless Shulkers' interactive full 27-slot preview above the other tooltip layer; the original tooltip is temporarily suppressed only for the locked view.
 - **Settings:** Modern Config + Modern GUI (preferred), otherwise Cloth Config, otherwise a minimal built-in screen. Both **Mod Menu**'s configuration button and the client command **`/seamlessshulkers`** use the same router and save into `config/seamless-shulkers.json`.
 
 ### Configuration libraries
 
 All GUI libraries are optional. To use Fayber's Modern Config UI, install compatible Minecraft 26.3 builds of [Modern Config](https://github.com/Fayberr/modern-config/tree/fabric/26.3) and [Modern GUI](https://github.com/Fayberr/modern-gui/tree/fabric/26.3) together. Otherwise install [Cloth Config](https://modrinth.com/mod/cloth-config). [Mod Menu](https://modrinth.com/mod/modmenu) adds the Mods list button. Both the Mod Menu button and the client command are available independently of the GUI choice.
+
+
+### Interactive preview controls
+
+| Gesture | Result |
+| --- | --- |
+| Hover Shulker | Original tooltip; with Shulker Box Tooltip installed, that mod owns it |
+| Hold Shift (without Shulker Box Tooltip) | Compact read-only item preview |
+| Hold Left Alt on Shulker | Pin a 27-slot interactive preview; release Alt to dismiss |
+| Left-click a preview slot | Take its entire stack; or deposit/merge your entire carried stack |
+| Right-click a preview slot | Take half (rounded up); or place **one** item into it (vanilla right-click semantics) |
+| Left-click a normal inventory slot outside the preview, **while still holding Alt** | Deposit your carried stack in the ordinary inventory, as in vanilla |
+
+Preview mouse events only intercept gestures starting **inside** the panel. They do not block the entire inventory or let preview mouse releases activate slots underneath.
 
 ## Installation
 
