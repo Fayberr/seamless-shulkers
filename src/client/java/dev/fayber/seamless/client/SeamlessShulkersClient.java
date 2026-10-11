@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemStack;
 
 public final class SeamlessShulkersClient implements ClientModInitializer {
     private int tick;
+    private final String[] lastKnownHotbarItems = new String[9];
 
     @Override
     public void onInitializeClient() {
@@ -27,11 +28,19 @@ public final class SeamlessShulkersClient implements ClientModInitializer {
     private void tick(Minecraft client) {
         if (client.player == null || client.level == null || client.gui.screen() != null) return;
         if (!ClientOptions.INSTANCE.hotbarRefill || !ClientPlayNetworking.canSend(RefillRequest.TYPE)) return;
-        if (++tick % 8 != 0) return;
         int slot = client.player.getInventory().getSelectedSlot();
         ItemStack stack = client.player.getInventory().getItem(slot);
-        if (stack.isEmpty() || stack.getCount() > ClientOptions.INSTANCE.refillAtOrBelow) return;
-        String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        String itemId = null;
+        if (!stack.isEmpty()) {
+            itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            lastKnownHotbarItems[slot] = itemId;
+        } else {
+            // An exhausted stack is refillable only while the player actively uses items.
+            if (!client.options.keyUse.isDown()) return;
+            itemId = lastKnownHotbarItems[slot];
+        }
+        if (itemId == null || ++tick % 8 != 0) return;
+        if (!stack.isEmpty() && stack.getCount() > ClientOptions.INSTANCE.refillAtOrBelow) return;
         ClientPlayNetworking.send(new RefillRequest(itemId, slot,
             Math.min(64, Math.max(1, ClientOptions.INSTANCE.refillUpTo))));
     }
