@@ -11,12 +11,13 @@ Fabric mod for Minecraft **26.3**. One JAR contains both client and server code.
 - Hold **Alt** while hovering a carried shulker to keep its preview open; while holding Alt, left/right-click slots to pick up or place items. Release Alt to dismiss.
 - Default behavior when `shulkerboxtooltip` is present: keep its ordinary hover preview, and use Seamless Shulkers' interactive view when Alt is held.
 - Automatic refills for the **selected hotbar slot**, using configurable target and threshold; recovering a fully exhausted selected slot while the use button remains pressed.
+- Optional **Litematica schematic pick-block hook**: when a schematic block is missing from normal inventory, request it from a carried shulker into an available hotbar slot. Placement may require repeating the Easy Place action after the network response; this is not yet zero-delay Direct Placement.
 - Villager trading: pressing **Space** in the normal merchant screen requests shulker contents for the **selected offer's payment slots**. The server validates the selected offer and costs, including trades requiring two items.
 - A native configuration screen available via **`/seamlessshulkers`** (in-world client command), with persisted settings. Its dependency on Modern Config is not required.
 
 ## Not yet implemented or verified
 
-- **Litematica Easy Place integration when a schematic block is missing entirely** from the regular inventory.
+- Fully seamless **Litematica Easy Place on the first click** for missing materials: an optional material-request hook exists, but it has not yet been integration-tested and waits for the server to refill a slot.
 - **True direct schematic placement** without any intermediate inventory transfer.
 - Integration with Modern Config/Modern GUI (their available branches target 26.1.x, not 26.3).
 - Optional alternate binding for Alt, Mod Menu entrypoint, accessibility enhancements, input conflicts, shift-click behavior, and richer inventory editing.
