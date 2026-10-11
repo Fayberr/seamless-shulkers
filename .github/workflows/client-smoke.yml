@@ -32,13 +32,17 @@ jobs:
       - name: Launch Fabric client with optional Litematica
         run: |
           set -euo pipefail
-          command -v xvfb-run >/dev/null || (sudo apt-get update && sudo apt-get install -y xvfb)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers
+          xvfb-run -a -s '-screen 0 1280x720x24 +extension GLX +render -noreset' glxinfo -B
           set +e
-          timeout 130s xvfb-run -a gradle --no-daemon runClient > /tmp/client.log 2>&1
+          timeout 130s env LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe MESA_GL_VERSION_OVERRIDE=4.6 \
+            xvfb-run -a -s '-screen 0 1280x720x24 +extension GLX +render -noreset' \
+            gradle --no-daemon runClient > /tmp/client.log 2>&1
           code=$?
           set -e
           tail -n 180 /tmp/client.log
-          if grep -Eqi 'MixinApplyError|InjectionError|MixinTransformerError|Failed to launch|Crash report|Could not initialize class' /tmp/client.log; then
+          if grep -Eqi 'MixinApplyError|InjectionError|MixinTransformerError|Failed to launch|Crash report|Could not initialize class|Failed to create backend OpenGL|Failed to create backend Vulkan|BackendCreationException' /tmp/client.log; then
             echo "Fatal client or mixin initialization error."
             exit 1
           fi
@@ -46,4 +50,4 @@ jobs:
             echo "Seamless Shulkers initializer was not observed (exit $code)."
             exit 1
           fi
-          echo "Client initialization reached. Full manual GUI and placement tests still required."
+          echo "Client boot completed without detected fatal renderer or mixin errors. Full manual GUI and placement tests still required."
