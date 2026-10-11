@@ -1,0 +1,39 @@
+name: Litematica 26.3 Compatibility
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  inspect-litematica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Fetch official Litematica 0.29.0
+        run: |
+          set -euo pipefail
+          curl --retry 3 -fsSL -H "User-Agent: seamless-shulkers-compat-test/0.1" \
+            "https://api.modrinth.com/v2/version/fEqsesPK" > /tmp/litematica-version.json
+          URL=$(jq -r '.files[] | select(.primary == true) | .url' /tmp/litematica-version.json | head -1)
+          test -n "$URL"
+          curl --retry 3 -fsSL "$URL" -o /tmp/litematica.jar
+          echo "Downloaded $(du -h /tmp/litematica.jar)"
+      - name: Inspect Easy Place bytecode hooks
+        run: |
+          set -euo pipefail
+          echo "=== Relevant classes ==="
+          jar tf /tmp/litematica.jar | grep -E 'fi/dy/masa/litematica/util/(WorldUtils|EasyPlaceUtils|InventoryUtils|EntityUtils)\.class' || true
+          echo "=== Invocations and method signatures in WorldUtils ==="
+          javap -classpath /tmp/litematica.jar -p -c fi.dy.masa.litematica.util.WorldUtils > /tmp/worldutils.txt
+          grep -n -E 'doEasyPlaceAction|schematicWorldPickBlock|getUsedHandForItem' /tmp/worldutils.txt || true
+          echo "=== Invocations and method signatures in EasyPlaceUtils ==="
+          javap -classpath /tmp/litematica.jar -p -c fi.dy.masa.litematica.util.EasyPlaceUtils > /tmp/easyplace.txt
+          grep -n -E 'handleEasyPlace|schematicWorldPickBlock|getUsedHandForItem' /tmp/easyplace.txt || true
+          echo "=== Hook assertion ==="
+          if ! grep -q 'schematicWorldPickBlock' /tmp/worldutils.txt && ! grep -q 'schematicWorldPickBlock' /tmp/easyplace.txt; then
+            echo "No expected pick-block hook found in official Litematica 0.29.0."
+            exit 1
+          fi
