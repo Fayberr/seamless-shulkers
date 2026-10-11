@@ -1,7 +1,6 @@
 package dev.fayber.seamless.client;
 
 import java.lang.reflect.Method;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -27,13 +26,13 @@ public final class ModernScreenBridge {
                 .invoke(null, Component.literal("Seamless Shulkers"), parent, (Runnable) c::save);
         Class<?> b = builder.getClass();
         Method category = b.getMethod("category", String.class);
-        Method bool = b.getMethod("bool", String.class, BooleanSupplier.class, Consumer.class);
+        Method bool = b.getMethod("bool", String.class, Supplier.class, Consumer.class);
         Method slider = b.getMethod("intSlider", String.class, IntSupplier.class, IntConsumer.class, int.class, int.class, int.class);
 
         category.invoke(builder, "Shulker Preview");
-        bool.invoke(builder, "Show preview", (BooleanSupplier) () -> c.preview, (Consumer<Boolean>) v -> c.preview = v);
-        bool.invoke(builder, "Interactive preview (Alt)", (BooleanSupplier) () -> c.interactivePreview, (Consumer<Boolean>) v -> c.interactivePreview = v);
-        bool.invoke(builder, "Prefer Shulker Box Tooltip", (BooleanSupplier) () -> c.preferExternalTooltip, (Consumer<Boolean>) v -> c.preferExternalTooltip = v);
+        bool.invoke(builder, "Show preview", (Supplier<Boolean>) () -> c.preview, (Consumer<Boolean>) v -> c.preview = v);
+        bool.invoke(builder, "Interactive preview (Alt)", (Supplier<Boolean>) () -> c.interactivePreview, (Consumer<Boolean>) v -> c.interactivePreview = v);
+        bool.invoke(builder, "Prefer Shulker Box Tooltip", (Supplier<Boolean>) () -> c.preferExternalTooltip, (Consumer<Boolean>) v -> c.preferExternalTooltip = v);
 
         category.invoke(builder, "Building");
         Method cycle = b.getMethod("cycle", String.class, Supplier.class, Consumer.class, Object[].class, Function.class);
@@ -41,12 +40,12 @@ public final class ModernScreenBridge {
                 (Supplier<ClientOptions.EasyPlaceMode>) () -> c.easyPlaceMode,
                 (Consumer<ClientOptions.EasyPlaceMode>) v -> c.easyPlaceMode = v,
                 ClientOptions.EasyPlaceMode.values(), (Function<ClientOptions.EasyPlaceMode, String>) Enum::name);
-        bool.invoke(builder, "Selected-slot auto-refill", (BooleanSupplier) () -> c.hotbarRefill, (Consumer<Boolean>) v -> c.hotbarRefill = v);
+        bool.invoke(builder, "Selected-slot auto-refill", (Supplier<Boolean>) () -> c.hotbarRefill, (Consumer<Boolean>) v -> c.hotbarRefill = v);
         slider.invoke(builder, "Refill threshold", (IntSupplier) () -> c.refillAtOrBelow, (IntConsumer) v -> c.refillAtOrBelow = v, 0, 63, 1);
         slider.invoke(builder, "Refill up to", (IntSupplier) () -> c.refillUpTo, (IntConsumer) v -> c.refillUpTo = v, 1, 64, 1);
 
         category.invoke(builder, "Villager Trading");
-        bool.invoke(builder, "Space trading refill", (BooleanSupplier) () -> c.tradingRefill, (Consumer<Boolean>) v -> c.tradingRefill = v);
+        bool.invoke(builder, "Space trading refill", (Supplier<Boolean>) () -> c.tradingRefill, (Consumer<Boolean>) v -> c.tradingRefill = v);
         return (Screen) b.getMethod("build").invoke(builder);
     }
 }
