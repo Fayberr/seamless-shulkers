@@ -18,6 +18,7 @@ public final class PreviewOverlay {
     private static final int FIRST_X = 8, FIRST_Y = 18, CELL = 18;
     private static int x, y, shulkerSlot = -1;
     private static boolean pinned;
+    public static boolean isPinned() { return pinned; }
     private static List<ItemStack> stacks = List.of();
 
     private PreviewOverlay() {}
@@ -31,8 +32,8 @@ public final class PreviewOverlay {
         if (hovered != null && hovered.container instanceof Inventory inventory) {
             int slot = hovered.getContainerSlot();
             if (slot >= 0 && slot < 36 && ShulkerStorage.isShulker(inventory.getItem(slot))) {
-                shulkerSlot = slot;
                 if (!pinned) {
+                    shulkerSlot = slot;
                     x = Math.min(mouseX + 12, mc.getWindow().getGuiScaledWidth() - WIDTH - 4);
                     y = Math.min(mouseY + 12, mc.getWindow().getGuiScaledHeight() - HEIGHT - 4);
                 }
@@ -62,6 +63,7 @@ public final class PreviewOverlay {
             }
             if (pinned && mouseX >= sx && mouseX < sx + 18 && mouseY >= sy && mouseY < sy + 18) {
                 graphics.fill(sx + 1, sy + 1, sx + 17, sy + 17, 0x80ffffff);
+                if (!stack.isEmpty()) graphics.setTooltipForNextFrame(mc.font, stack, mouseX, mouseY);
             }
         }
     }
