@@ -5,9 +5,13 @@
   "mixins": [
     "ContainerScreenMixin",
     "MerchantScreenMixin",
-    "LitematicaPickMixin"
+    "LitematicaPickMixin",
+    "LitematicaLegacyDirectMixin",
+    "LitematicaRewriteDirectMixin",
+    "ClientUseOnMixin"
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "plugin": "dev.fayber.seamless.client.mixin.CompatMixinPlugin"
 }
