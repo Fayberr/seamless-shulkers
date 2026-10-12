@@ -22,3 +22,10 @@ jobs:
         with:
           name: seamless-shulkers-jar
           path: build/libs/*.jar
+      # Same code with the [SS-DEBUG] trace switched on, for diagnosing in-game reports.
+      - run: gradle --no-daemon jar -PdebugBuild
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: seamless-shulkers-debug-jar
+          path: build/libs/*-debug.jar

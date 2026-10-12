@@ -12,7 +12,10 @@
     "LitematicaPickMixin",
     "LitematicaLegacyDirectMixin",
     "LitematicaRewriteDirectMixin",
-    "ClientUseOnMixin"
+    "ClientUseOnMixin",
+    "ClientInputDebugMixin",
+    "ClientClickDebugMixin",
+    "ClientSyncDebugMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -20,6 +20,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -191,6 +193,55 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         clickCell(c, 1, LEFT);
         sync(c, conn);
 
+        // Reported in game: the harness drops modifier flags from mouse events, so these clicks are
+        // dispatched with the flags a real click carries while the keys are held.
+        int before = serverBox(server).get(2).getCount();
+        // unlocked, Shift+Alt held: Shift is part of the gesture, a plain pickup
+        modClick(c, 2, MOD_SHIFT | MOD_ALT);
+        sync(c, conn);
+        check(serverCarried(server).getCount() == before, tag + ": Shift+Alt click did not pick up: cursor " + serverCarried(server) + " box " + serverBox(server).get(2));
+        modClick(c, 2, MOD_SHIFT | MOD_ALT);
+        sync(c, conn);
+        // lock with Ctrl while Shift+Alt are held and keep all three held
+        input.holdControl();
+        c.waitTicks(3);
+        state = c.computeOnClient(mc -> PreviewController.state());
+        check(state != null && state.locked() && state.interactive(), tag + ": ctrl did not lock: " + state);
+        modClick(c, 2, MOD_SHIFT | MOD_ALT | MOD_CTRL);
+        sync(c, conn);
+        System.out.println("[SeamlessShulkers client test] " + tag + " held-lock click: box " + serverBox(server).get(2) + " cursor " + serverCarried(server));
+        check(serverCarried(server).getCount() == before, tag + ": click with Shift+Alt+Ctrl held did not pick up: cursor " + serverCarried(server) + " box " + serverBox(server).get(2));
+        modClick(c, 2, MOD_SHIFT | MOD_ALT | MOD_CTRL);
+        sync(c, conn);
+        check(serverBox(server).get(2).getCount() == before, tag + ": held-lock put back " + serverBox(server).get(2));
+        input.releaseControl();
+        input.releaseAlt();
+        input.releaseShift();
+        c.waitTicks(3);
+        // locked, no keys: plain pickup
+        modClick(c, 2, 0);
+        sync(c, conn);
+        check(serverCarried(server).getCount() == before, tag + ": locked click without keys did not pick up: " + serverCarried(server));
+        modClick(c, 2, 0);
+        sync(c, conn);
+        // locked, Shift alone: quick move out of the box into the inventory
+        input.holdShift();
+        modClick(c, 2, MOD_SHIFT);
+        input.releaseShift();
+        sync(c, conn);
+        check(serverCarried(server).isEmpty() && serverBox(server).get(2).getCount() < before,
+            tag + ": locked Shift-click did not quick move out: box " + serverBox(server).get(2) + " cursor " + serverCarried(server));
+        check(serverTotal(server, Items.ARROW) == arrows, tag + ": arrows not conserved after quick move");
+        input.pressKey(InputConstants.KEY_LCONTROL);
+        c.waitTicks(3);
+        check(c.computeOnClient(mc -> PreviewController.state()) == null, tag + ": unlock after held-lock check did not close");
+        input.holdShift();
+        input.holdAlt();
+        c.waitTicks(3);
+        hoverSlot(c, BOX);
+        c.waitTicks(3);
+        server.waitFor(s -> serverBound(s), 100);
+
         // Ctrl locks: releasing Shift+Alt keeps the panel, Shift-click is a quick move again
         input.pressKey(InputConstants.KEY_LCONTROL);
         input.releaseAlt();
@@ -199,11 +250,16 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         state = c.computeOnClient(mc -> PreviewController.state());
         check(state != null && state.locked() && state.interactive(), tag + ": lock did not keep the panel: " + state);
         c.takeScreenshot(tag + "-state-c-locked");
+        // locked, Shift alone on an inventory stack: quick move into the box (not a pickup)
+        int inBox = serverBoxTotal(server, Items.ARROW);
+        ItemStack moving = serverSlot(server, free[1]).copy();
         input.holdShift();
-        clickSlot(c, free[1], LEFT);
+        modClickSlot(c, free[1], MOD_SHIFT);
         input.releaseShift();
         sync(c, conn);
-        check(serverSlot(server, free[1]).isEmpty(), tag + ": locked shift-click did not quick move " + serverSlot(server, free[1]));
+        check(serverSlot(server, free[1]).isEmpty() && serverCarried(server).isEmpty()
+                && serverBoxTotal(server, Items.ARROW) == inBox + moving.getCount(),
+            tag + ": locked shift-click did not quick move into the box: slot " + serverSlot(server, free[1]) + " cursor " + serverCarried(server));
 
         // Unlock: with no keys held the panel closes and the server releases the binding
         input.pressKey(InputConstants.KEY_LCONTROL);
@@ -287,6 +343,38 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         c.waitTicks(2);
     }
 
+    static final int MOD_SHIFT = 0x0001, MOD_CTRL = 0x0040, MOD_ALT = 0x0100;
+
+    /** Left click on a panel cell, delivered to the screen with real modifier flags (press and release). */
+    static void modClick(ClientGameTestContext c, int index, int modifiers) {
+        moveToCell(c, index);
+        c.runOnClient(mc -> {
+            PreviewController.State state = PreviewController.state();
+            if (state == null) throw new AssertionError("no pinned panel for cell " + index);
+            Screen screen = mc.gui.screen();
+            MouseButtonEvent event = new MouseButtonEvent(state.cellCenterX(index) + 0.5, state.cellCenterY(index) + 0.5,
+                new MouseButtonInfo(1, modifiers));
+            screen.mouseClicked(event, false);
+            screen.mouseReleased(event);
+        });
+        c.waitTicks(2);
+    }
+
+    /** Left click on an inventory slot with real modifier flags. */
+    static void modClickSlot(ClientGameTestContext c, int menuSlot, int modifiers) {
+        moveToSlot(c, menuSlot);
+        c.runOnClient(mc -> {
+            InventoryScreen screen = screen(mc);
+            AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) screen;
+            Slot slot = mc.player.inventoryMenu.getSlot(menuSlot);
+            MouseButtonEvent event = new MouseButtonEvent(accessor.seamless$leftPos() + slot.x + 8.5, accessor.seamless$topPos() + slot.y + 8.5,
+                new MouseButtonInfo(1, modifiers));
+            screen.mouseClicked(event, false);
+            screen.mouseReleased(event);
+        });
+        c.waitTicks(2);
+    }
+
     static void clickCell(ClientGameTestContext c, int index, int button) {
         moveToCell(c, index);
         press(c, button);
@@ -344,6 +432,10 @@ public class PreviewClientGameTest implements FabricClientGameTest {
             player(s).getInventory().getItem(BOX).getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items);
             return items;
         });
+    }
+
+    static int serverBoxTotal(TestServerContext server, Item item) {
+        return serverBox(server).stream().filter(stack -> stack.is(item)).mapToInt(ItemStack::getCount).sum();
     }
 
     static int serverTotal(TestServerContext server, Item item) {

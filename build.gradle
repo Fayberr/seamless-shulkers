@@ -2,7 +2,7 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'maven-publish'
 }
-version = project.mod_version
+version = project.mod_version + (project.hasProperty('debugBuild') ? '-debug' : '')
 group = project.maven_group
 base { archivesName = project.archive_base_name }
 repositories {
@@ -49,6 +49,11 @@ dependencies {
 }
 processResources {
     inputs.property 'version', project.version
+    inputs.property 'debugBuild', project.hasProperty('debugBuild')
+    // Debug builds ship a marker that switches on the [SS-DEBUG] trace (see PreviewDebug).
+    if (project.hasProperty('debugBuild')) {
+        from(resources.text.fromString('debug build')) { rename { 'seamlessshulkers-debug.marker' } }
+    }
     filesMatching('fabric.mod.json') { expand version: project.version }
 }
 tasks.withType(JavaCompile).configureEach {

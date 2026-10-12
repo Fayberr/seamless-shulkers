@@ -2,6 +2,7 @@ package dev.fayber.seamless.client.preview;
 
 import dev.fayber.seamless.preview.PreviewLayout;
 import dev.fayber.seamless.client.ClientOptions;
+import dev.fayber.seamless.debug.PreviewDebug;
 import dev.fayber.seamless.client.mixin.AbstractContainerScreenAccessor;
 import dev.fayber.seamless.preview.PreviewBindRequest;
 import dev.fayber.seamless.preview.PreviewMenu;
@@ -123,12 +124,13 @@ public final class PreviewController {
     }
 
     /**
-     * While an unlocked pin is held open with Shift+Alt, Shift is part of the gesture and must not
-     * turn clicks into quick-moves. A locked pin leaves Shift-click to vanilla.
+     * While Shift+Alt hold the pin open, Shift is part of the gesture and must not turn clicks into
+     * quick-moves. That stays true after locking with Ctrl while both keys are still held. Only a
+     * locked pin clicked with Shift alone (Alt released) gets vanilla's Shift-click quick-move.
      */
     public static boolean suppressShift(AbstractContainerScreen<?> screen) {
         Pin p = pin;
-        return p != null && p.screen == screen && !p.locked;
+        return p != null && p.screen == screen && (!p.locked || PreviewKeys.alt());
     }
 
     /** Hover resolution while pinned: preview slots inside the panel, ordinary slots elsewhere. */
@@ -164,21 +166,28 @@ public final class PreviewController {
         Minecraft minecraft = Minecraft.getInstance();
         Pin p = pin;
         if (p != null && p.screen != screen) {
+            PreviewDebug.log("client: pin closed (screen changed)");
             close();
             p = null;
         }
         if (!ClientOptions.INSTANCE.preview || minecraft.player == null) {
+            if (p != null) PreviewDebug.log("client: pin closed (preview disabled or no player)");
             close();
             return;
         }
         boolean fullKeys = PreviewKeys.shift() && PreviewKeys.alt();
         if (p != null) {
             boolean dragging = ((AbstractContainerScreenAccessor) screen).seamless$isQuickCrafting();
-            if (p.bound != null && !p.bound.isBound()) downgrade(p, true);
+            if (p.bound != null && !p.bound.isBound()) {
+                PreviewDebug.log("client: client-side binding lost, pin downgraded to display-only");
+                downgrade(p, true);
+            }
             if (!ShulkerRules.isShulker(p.source.getItem())) {
+                PreviewDebug.log("client: pin closed (box left its slot)");
                 close();
                 p = null;
             } else if (!p.locked && !fullKeys && !dragging) {
+                PreviewDebug.log("client: pin closed (keys released, not locked) shift={} alt={}", PreviewKeys.shift(), PreviewKeys.alt());
                 close();
                 p = null;
             } else if (!p.full && fullKeys) {
@@ -196,10 +205,13 @@ public final class PreviewController {
 
     /** Control toggles the lock of an open pin, or (without Shulker Box Tooltip) locks the Shift preview. */
     public static void keyPressed(AbstractContainerScreen<?> screen, int key) {
+        PreviewDebug.log("client: key {} in {} (shift={} alt={} ctrl={}) pin={}", key, screen.getClass().getSimpleName(),
+            PreviewKeys.shift(), PreviewKeys.alt(), PreviewKeys.control(), state());
         if (!PreviewKeys.isControlKey(key) || !ClientOptions.INSTANCE.preview) return;
         Pin p = pin;
         if (p != null && p.screen == screen) {
             p.locked = !p.locked;
+            PreviewDebug.log("client: pin {}", p.locked ? "LOCKED" : "UNLOCKED");
             return;
         }
         if (p != null || ShulkerTooltips.externalTooltipOwnsCompact() || !PreviewKeys.shift()) return;
@@ -210,6 +222,8 @@ public final class PreviewController {
     }
 
     private static void open(AbstractContainerScreen<?> screen, Slot source, boolean full, boolean locked, int mouseX, int mouseY) {
+        PreviewDebug.log("client: pin open source={} full={} locked={} screen={}", PreviewDebug.slot(source), full, locked,
+            screen.getClass().getName());
         Pin p = new Pin(screen, source, mouseX, mouseY);
         p.full = full;
         p.locked = locked;
@@ -222,19 +236,37 @@ public final class PreviewController {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         ClientPacketListener connection = minecraft.getConnection();
-        if (!ClientOptions.INSTANCE.interactivePreview || player == null || connection == null || player.isSpectator()) return;
-        if (p.screen.getMenu() != player.inventoryMenu || p.source.container != player.getInventory()) return;
+        if (!ClientOptions.INSTANCE.interactivePreview || player == null || connection == null || player.isSpectator()) {
+            PreviewDebug.log("client: display-only (interactive option={}, spectator={})", ClientOptions.INSTANCE.interactivePreview,
+                player != null && player.isSpectator());
+            return;
+        }
+        if (p.screen.getMenu() != player.inventoryMenu || p.source.container != player.getInventory()) {
+            PreviewDebug.log("client: display-only (not the player inventory menu: {})", p.screen.getMenu().getClass().getName());
+            return;
+        }
         int inventorySlot = p.source.getContainerSlot();
         ItemStack box = p.source.getItem();
-        if (!ShulkerRules.isBindableInventorySlot(inventorySlot) || !ShulkerRules.isEditable(box)) return;
-        if (!ClientPlayNetworking.canSend(PreviewBindRequest.TYPE)) return;
+        if (!ShulkerRules.isBindableInventorySlot(inventorySlot) || !ShulkerRules.isEditable(box)) {
+            PreviewDebug.log("client: display-only (slot {} not bindable or box not editable: {})", inventorySlot, PreviewDebug.stack(box));
+            return;
+        }
+        if (!ClientPlayNetworking.canSend(PreviewBindRequest.TYPE)) {
+            PreviewDebug.log("client: display-only (server does not have the mod)");
+            return;
+        }
         PreviewMenu menu = (PreviewMenu) player.inventoryMenu;
         ShulkerPreviewContainer container = menu.seamless$preview();
-        if (!container.bind(inventorySlot)) return;
+        if (!container.bind(inventorySlot)) {
+            PreviewDebug.log("client: display-only (client bind of slot {} failed)", inventorySlot);
+            return;
+        }
         p.bound = container;
         p.firstSlot = menu.seamless$firstPreviewSlot();
         p.containerId = player.inventoryMenu.containerId;
         p.token = ++lastToken;
+        PreviewDebug.log("client: BIND sent slot={} token={} containerId={} firstPreviewSlot={} menuSlots={} box={}", inventorySlot, p.token,
+            p.containerId, p.firstSlot, player.inventoryMenu.slots.size(), PreviewDebug.stack(box));
         ClientPlayNetworking.send(new PreviewBindRequest(p.containerId, inventorySlot, p.token,
             HashedStack.create(box, connection.decoratedHashOpsGenenerator())));
     }
@@ -242,6 +274,7 @@ public final class PreviewController {
     /** Ends interaction but keeps showing the box. */
     private static void downgrade(Pin p, boolean tellServer) {
         if (p.bound == null) return;
+        PreviewDebug.log("client: binding token={} ended (tellServer={})", p.token, tellServer);
         p.bound.unbind();
         p.bound = null;
         if (tellServer && ClientPlayNetworking.canSend(PreviewBindRequest.TYPE)) {
@@ -269,6 +302,7 @@ public final class PreviewController {
     /** The server refused or ended binding {@code token}. Older tokens are stale and ignored. */
     public static void onReleased(int token) {
         Pin p = pin;
+        PreviewDebug.log("client: server RELEASED token={} (current pin token={})", token, p == null ? "none" : p.token);
         if (p != null && p.bound != null && p.token == token) downgrade(p, false);
     }
 

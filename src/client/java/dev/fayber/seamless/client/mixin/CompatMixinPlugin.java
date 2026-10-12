@@ -12,6 +12,8 @@ public final class CompatMixinPlugin implements IMixinConfigPlugin {
     @Override public String getRefMapperConfig() { return null; }
     @Override public boolean shouldApplyMixin(String target, String mixin) {
         if (mixin.contains("Litematica")) return FabricLoader.getInstance().isModLoaded("litematica");
+        // Diagnostic hooks exist only in debug builds; release builds do not touch these classes.
+        if (mixin.endsWith("DebugMixin")) return dev.fayber.seamless.debug.PreviewDebug.ENABLED;
         return true;
     }
     @Override public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {}

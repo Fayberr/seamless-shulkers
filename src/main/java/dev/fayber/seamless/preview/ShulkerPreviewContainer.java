@@ -96,6 +96,8 @@ public final class ShulkerPreviewContainer implements Container {
         // on the server. The client follows the slot and is corrected by the server if it diverges.
         boolean sameBox = server ? stack == boundStack : stack.getItem() == boundItem;
         if (!sameBox || !ShulkerRules.isEditable(stack)) {
+            dev.fayber.seamless.debug.PreviewDebug.log("{}: binding of slot {} died (sameBox={}, now {})", server ? "server" : "client",
+                boundSlot, sameBox, dev.fayber.seamless.debug.PreviewDebug.stack(stack));
             unbind();
             invalidated = true;
             return null;

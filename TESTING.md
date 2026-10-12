@@ -31,11 +31,16 @@ A box with 12, 17 and 46 arrows and 5 stone, plus one loose arrow:
 - State A shows the summary and hint and no item list. State B shows the compact merged preview. State C opens the full grid, the server binds it.
 - With Shulker Box Tooltip loaded: A and B are its tooltips with none of our lines, State C shows only our panel.
 - Scenarios A to F through real clicks and a real mouse drag, checked against the server inventory.
-- Control locks the panel so the keys can be released, a locked Shift-click quick-moves, Control again closes it and the server releases the binding.
+- Control locks the panel so the keys can be released, Control again closes it and the server releases the binding.
+- Clicks with real modifier flags (the harness drops them from simulated mouse input, so these are dispatched to the screen directly): Shift+Alt click picks up, a click with Shift+Alt+Ctrl held after locking picks up, a locked click without keys picks up, a locked Shift-click quick-moves out of and into the box.
 - Item conservation and client/server box equality at the end.
 - `/seamlessshulkers` opens the settings screen.
 
 Screenshots of every state are written to `build/run/clientGameTest/screenshots`.
+
+## Debug build
+
+For in-game reports, install the debug JAR (see README) and send the `[SS-DEBUG]` lines from `logs/latest.log` (`findstr SS-DEBUG latest.log` on Windows).
 
 ## Manual checklist (not covered by automated tests)
 

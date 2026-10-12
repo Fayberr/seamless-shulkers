@@ -24,6 +24,11 @@ public final class SeamlessShulkersClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        if (dev.fayber.seamless.debug.PreviewDebug.ENABLED) {
+            dev.fayber.seamless.debug.PreviewDebug.log("DEBUG BUILD active. Loaded mods: {}", net.fabricmc.loader.api.FabricLoader.getInstance()
+                .getAllMods().stream().map(m -> m.getMetadata().getId() + "@" + m.getMetadata().getVersion().getFriendlyString())
+                .filter(m -> !m.startsWith("fabric-") && !m.startsWith("java@") && !m.startsWith("mixinextras")).sorted().toList());
+        }
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         ClientTooltipComponentCallback.EVENT.register(data ->
             data instanceof ShulkerTooltip tooltip ? new ClientShulkerTooltip(tooltip) : null);

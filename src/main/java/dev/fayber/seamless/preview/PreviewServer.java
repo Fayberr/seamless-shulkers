@@ -1,5 +1,6 @@
 package dev.fayber.seamless.preview;
 
+import dev.fayber.seamless.debug.PreviewDebug;
 import dev.fayber.seamless.mixin.AbstractContainerMenuAccessor;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
@@ -13,6 +14,7 @@ public final class PreviewServer {
     public static void handleBind(ServerPlayer player, PreviewBindRequest request) {
         ShulkerPreviewContainer preview = ((PreviewMenu) player.inventoryMenu).seamless$preview();
         if (request.inventorySlot() < 0) {
+            PreviewDebug.log("server: release request token={} (bound token={}, bound={})", request.token(), preview.token(), preview.isBound());
             preview.unbind();
             return;
         }
@@ -22,6 +24,15 @@ public final class PreviewServer {
             && ShulkerRules.isBindableInventorySlot(request.inventorySlot())
             && clientSeesSameBox(player, request)
             && preview.bind(request.inventorySlot());
+        if (PreviewDebug.ENABLED) {
+            PreviewDebug.log("server: bind request slot={} token={} containerId={} (menu {}) -> {} [spectator={} otherMenuOpen={} bindableSlot={} sameBox={} serverBox={}]",
+                request.inventorySlot(), request.token(), request.containerId(), player.inventoryMenu.containerId,
+                accepted ? "ACCEPTED" : "REFUSED", player.isSpectator(), player.containerMenu != player.inventoryMenu,
+                ShulkerRules.isBindableInventorySlot(request.inventorySlot()),
+                ShulkerRules.isBindableInventorySlot(request.inventorySlot()) && clientSeesSameBox(player, request),
+                ShulkerRules.isBindableInventorySlot(request.inventorySlot())
+                    ? PreviewDebug.stack(player.getInventory().getItem(request.inventorySlot())) : "-");
+        }
         if (accepted) {
             preview.setToken(request.token());
         } else {

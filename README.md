@@ -2,7 +2,7 @@
 
 Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both client and dedicated-server functionality.
 
-**Status: pre-release (0.1.0-alpha.6).** `gradle build` runs unit tests and server-side game tests of every preview interaction. A client game test drives the real inventory screen with mouse and keyboard input in singleplayer and on a dedicated server, with and without Shulker Box Tooltip. See [TESTING.md](TESTING.md) for what is automated and what still needs hands-on verification.
+**Status: pre-release (0.1.0-alpha.7).** `gradle build` runs unit tests and server-side game tests of every preview interaction. A client game test drives the real inventory screen with mouse and keyboard input in singleplayer and on a dedicated server, with and without Shulker Box Tooltip. See [TESTING.md](TESTING.md) for what is automated and what still needs hands-on verification.
 
 ## Features
 
@@ -25,7 +25,7 @@ Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both clie
 | B | Hold Shift | Compact read-only preview: equal items merged, sorted by total count, empty slots hidden. Hints for the full view and the lock key |
 | C | Hold Shift + Alt | Full 9x3 grid in original slot order. It stays where it opened while the cursor moves into it |
 
-- **Left Control** locks the open panel, so Shift and Alt can be released. Press Control again to unlock and close it. Without Shulker Box Tooltip, Control in State B locks the compact preview.
+- **Left Control** locks the open panel, so Shift and Alt can be released. While Shift and Alt are still held, clicks stay normal clicks; once Alt is released, Shift-click on a locked panel is a quick move. Press Control again to unlock and close it. Without Shulker Box Tooltip, Control in State B locks the compact preview.
 - The State C panel is **interactive** in the player inventory screen (survival and adventure) when the server has the mod. In every other screen (chests, creative), and on servers without the mod, it is display-only.
 
 ### Interacting with the full preview
@@ -67,6 +67,10 @@ Options: shulker preview on/off, editable full preview on/off, hotbar auto-refil
 - `gradle build` (Gradle 9.7.1, JDK 25): compiles, runs the unit tests and the server game tests.
 - `xvfb-run -a -s "-screen 0 1920x1080x24" gradle runClientGameTest`: client game test with real input, in singleplayer and on a dedicated server. Add `-PwithSbt` to run it with Shulker Box Tooltip 5.4.2 on the runtime classpath (never bundled). Screenshots land in `build/run/clientGameTest/screenshots`.
 - GitHub Actions: `Build` (publishes the JAR), `Client Game Test` (manual trigger only; with and without Shulker Box Tooltip, uploads screenshots), `Litematica 26.3 Compatibility`, `Dedicated Server Smoke`, `Client Loader Smoke`.
+
+### Debug build
+
+`gradle build -PdebugBuild` (or the `seamless-shulkers-debug-jar` CI artifact) produces `seamless-shulkers-<version>-debug.jar`. It writes every mouse button, every container click the client sends and predicts, every server correction, the panel's open/lock/bind/release decisions, and the server's handling of each click to `logs/latest.log` with the prefix `[SS-DEBUG]`, plus the list of loaded mods at startup. The same trace can be enabled in a release JAR with the JVM flag `-Dseamlessshulkers.debug=true`. Use it only for diagnosis; it logs a lot.
 
 **A green build is not proof that every in-game interaction works.** Test with disposable worlds and inventories first.
 

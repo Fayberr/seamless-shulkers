@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import dev.fayber.seamless.TradeRefillRequest;
 import dev.fayber.seamless.client.ClientOptions;
 import dev.fayber.seamless.client.preview.PreviewController;
+import dev.fayber.seamless.debug.PreviewDebug;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -30,6 +31,28 @@ public abstract class ContainerScreenMixin {
     @Unique
     private AbstractContainerScreen<?> seamless$self() {
         return (AbstractContainerScreen<?>) (Object) this;
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"))
+    private void seamless$debugClickStart(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        if (!PreviewDebug.ENABLED) return;
+        AbstractContainerScreen<?> screen = seamless$self();
+        AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) screen;
+        PreviewDebug.log("client: container mouseClicked HEAD button={} x={} y={} shift={} mods={} pin={} insidePanel={} hovered={} carried={} quickCrafting={}",
+            event.button(), String.format("%.1f", event.x()), String.format("%.1f", event.y()), event.hasShiftDown(), event.modifiers(),
+            PreviewController.state(), PreviewController.inside(screen, event.x(), event.y()),
+            PreviewDebug.slot(accessor.seamless$getHoveredSlot(event.x(), event.y())), PreviewDebug.stack(screen.getMenu().getCarried()),
+            accessor.seamless$isQuickCrafting());
+    }
+
+    @Inject(method = "mouseReleased", at = @At("HEAD"))
+    private void seamless$debugReleaseStart(MouseButtonEvent event, CallbackInfoReturnable<Boolean> cir) {
+        if (!PreviewDebug.ENABLED) return;
+        AbstractContainerScreen<?> screen = seamless$self();
+        PreviewDebug.log("client: container mouseReleased HEAD button={} insidePanel={} hovered={} carried={} quickCrafting={}",
+            event.button(), PreviewController.inside(screen, event.x(), event.y()),
+            PreviewDebug.slot(((AbstractContainerScreenAccessor) screen).seamless$getHoveredSlot(event.x(), event.y())),
+            PreviewDebug.stack(screen.getMenu().getCarried()), ((AbstractContainerScreenAccessor) screen).seamless$isQuickCrafting());
     }
 
     @Inject(method = "getHoveredSlot", at = @At("HEAD"), cancellable = true)

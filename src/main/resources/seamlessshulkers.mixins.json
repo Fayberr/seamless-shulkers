@@ -8,7 +8,8 @@
     "AbstractContainerMenuInvoker",
     "AbstractContainerMenuMixin",
     "InventoryMenuAccessor",
-    "InventoryMenuMixin"
+    "InventoryMenuMixin",
+    "ServerClickDebugMixin"
   ],
   "injectors": {"defaultRequire": 1}
 }
