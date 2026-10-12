@@ -21,10 +21,10 @@ public final class ClothScreenBridge {
         ConfigCategory display = builder.getOrCreateCategory(Component.literal("Shulker Preview"));
         display.addEntry(eb.startBooleanToggle(Component.literal("Show preview"), c.preview)
                 .setDefaultValue(true).setSaveConsumer(value -> c.preview = value).build());
-        display.addEntry(eb.startBooleanToggle(Component.literal("Interactive preview (hold Alt)"), c.interactivePreview)
-                .setDefaultValue(true).setSaveConsumer(value -> c.interactivePreview = value).build());
-        display.addEntry(eb.startBooleanToggle(Component.literal("Prefer Shulker Box Tooltip"), c.preferExternalTooltip)
-                .setDefaultValue(true).setSaveConsumer(value -> c.preferExternalTooltip = value).build());
+        display.addEntry(eb.startBooleanToggle(Component.literal("Editable full preview (Shift+Alt)"), c.interactivePreview)
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("Take and place items in the pinned full preview of a shulker box in your inventory."))
+                .setSaveConsumer(value -> c.interactivePreview = value).build());
 
         ConfigCategory building = builder.getOrCreateCategory(Component.literal("Building"));
         building.addEntry(eb.startEnumSelector(Component.literal("Easy Place supply mode"),

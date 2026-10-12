@@ -13,7 +13,6 @@ public final class ClientOptions {
     public boolean hotbarRefill = false;
     public int refillAtOrBelow = 8;
     public int refillUpTo = 64;
-    public boolean preferExternalTooltip = true;
     public boolean tradingRefill = true;
     public enum EasyPlaceMode { DIRECT, INVENTORY_REFILL, OFF }
     public EasyPlaceMode easyPlaceMode = EasyPlaceMode.DIRECT;

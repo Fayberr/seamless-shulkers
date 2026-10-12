@@ -31,8 +31,7 @@ public final class ModernScreenBridge {
 
         category.invoke(builder, "Shulker Preview");
         bool.invoke(builder, "Show preview", (Supplier<Boolean>) () -> c.preview, (Consumer<Boolean>) v -> c.preview = v);
-        bool.invoke(builder, "Interactive preview (Alt)", (Supplier<Boolean>) () -> c.interactivePreview, (Consumer<Boolean>) v -> c.interactivePreview = v);
-        bool.invoke(builder, "Prefer Shulker Box Tooltip", (Supplier<Boolean>) () -> c.preferExternalTooltip, (Consumer<Boolean>) v -> c.preferExternalTooltip = v);
+        bool.invoke(builder, "Editable full preview (Shift+Alt)", (Supplier<Boolean>) () -> c.interactivePreview, (Consumer<Boolean>) v -> c.interactivePreview = v);
 
         category.invoke(builder, "Building");
         Method cycle = b.getMethod("cycle", String.class, Supplier.class, Consumer.class, Object[].class, Function.class);

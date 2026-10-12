@@ -1,3 +1,10 @@
 {
-  "seamlessshulkers.name": "Seamless Shulkers"
+  "seamlessshulkers.name": "Seamless Shulkers",
+  "seamlessshulkers.tooltip.empty": "Empty",
+  "seamlessshulkers.tooltip.contains_one": "Contains 1 stack",
+  "seamlessshulkers.tooltip.contains": "Contains %s stacks",
+  "seamlessshulkers.hint.view": "view contents",
+  "seamlessshulkers.hint.full": "view full contents",
+  "seamlessshulkers.hint.lock": "lock tooltip",
+  "seamlessshulkers.hint.unlock": "unlock tooltip"
 }

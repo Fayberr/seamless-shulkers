@@ -10,6 +10,10 @@ repositories {
     maven { url = "https://maven.shedaniel.me/" }
     maven { url = "https://maven.terraformersmc.com/releases/" }
     maven { url = 'https://maven.fabricmc.net/' }
+    exclusiveContent {
+        forRepository { maven { url = "https://api.modrinth.com/maven" } }
+        filter { includeGroup "maven.modrinth" }
+    }
 }
 loom {
     splitEnvironmentSourceSets()
@@ -20,6 +24,15 @@ loom {
         }
     }
 }
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "seamlessshulkers-test"
+        enableGameTests = true
+        enableClientGameTests = true
+        eula = true
+    }
+}
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${loader_version}"
@@ -28,6 +41,11 @@ dependencies {
     compileOnly "com.terraformersmc:modmenu:21.0.0-beta.1"
     testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    // Opt-in compatibility run: `gradle runClientGameTest -PwithSbt` adds Shulker Box Tooltip to the
+    // test client only. It is never bundled, declared or needed at runtime.
+    if (project.hasProperty('withSbt')) {
+        localRuntime "maven.modrinth:shulkerboxtooltip:${project.findProperty('sbt_version') ?: '5.4.2+26.3-fabric'}"
+    }
 }
 processResources {
     inputs.property 'version', project.version

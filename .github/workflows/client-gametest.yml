@@ -1,0 +1,41 @@
+name: Client Game Test
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/client-gametest.yml'
+  workflow_dispatch:
+jobs:
+  client-gametest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        sbt: [false, true]
+    name: client game test (Shulker Box Tooltip ${{ matrix.sbt && 'installed' || 'absent' }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.1'
+      - name: Install virtual display
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+      - name: Run client game test
+        run: |
+          extra=""
+          if [ "${{ matrix.sbt }}" = "true" ]; then extra="-PwithSbt"; fi
+          xvfb-run -a -s "-screen 0 1920x1080x24" gradle --no-daemon runClientGameTest $extra
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: client-gametest-screenshots-${{ matrix.sbt && 'sbt' || 'plain' }}
+          path: build/run/clientGameTest/screenshots
+          if-no-files-found: ignore

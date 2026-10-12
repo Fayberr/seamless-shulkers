@@ -19,22 +19,21 @@ public final class SettingsScreen extends Screen {
         int x = this.width / 2 - 115;
         int y = Math.max(35, this.height / 2 - 110);
         addBoolean(x, y, "Shulker preview", () -> options.preview, v -> options.preview = v);
-        addBoolean(x, y + 23, "Interactive Alt preview", () -> options.interactivePreview, v -> options.interactivePreview = v);
-        addBoolean(x, y + 46, "Prefer Shulker Box Tooltip", () -> options.preferExternalTooltip, v -> options.preferExternalTooltip = v);
-        addBoolean(x, y + 69, "Hotbar auto-refill", () -> options.hotbarRefill, v -> options.hotbarRefill = v);
-        addBoolean(x, y + 92, "Space trading refill", () -> options.tradingRefill, v -> options.tradingRefill = v);
+        addBoolean(x, y + 23, "Editable full preview", () -> options.interactivePreview, v -> options.interactivePreview = v);
+        addBoolean(x, y + 46, "Hotbar auto-refill", () -> options.hotbarRefill, v -> options.hotbarRefill = v);
+        addBoolean(x, y + 69, "Space trading refill", () -> options.tradingRefill, v -> options.tradingRefill = v);
 
         this.addRenderableWidget(Button.builder(Component.literal("Refill threshold: " + options.refillAtOrBelow),
             button -> {
                 options.refillAtOrBelow = (options.refillAtOrBelow + 4) % 36;
                 button.setMessage(Component.literal("Refill threshold: " + options.refillAtOrBelow));
-            }).bounds(x, y + 115, 230, 20).build());
+            }).bounds(x, y + 92, 230, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Refill target: " + options.refillUpTo),
             button -> {
                 options.refillUpTo = options.refillUpTo >= 64 ? 1 : Math.min(64, options.refillUpTo + 8);
                 button.setMessage(Component.literal("Refill target: " + options.refillUpTo));
-            }).bounds(x, y + 138, 230, 20).build());
+            }).bounds(x, y + 115, 230, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Easy Place: " + options.easyPlaceMode),
             button -> {
@@ -44,13 +43,13 @@ public final class SettingsScreen extends Screen {
                     case OFF -> ClientOptions.EasyPlaceMode.DIRECT;
                 };
                 button.setMessage(Component.literal("Easy Place: " + options.easyPlaceMode));
-            }).bounds(x, y + 161, 230, 20).build());
+            }).bounds(x, y + 138, 230, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Save and close"),
             button -> {
                 options.save();
                 this.minecraft.gui.setScreen(parent);
-            }).bounds(x, y + 184, 230, 20).build());
+            }).bounds(x, y + 161, 230, 20).build());
     }
 
     private void addBoolean(int x, int y, String title,

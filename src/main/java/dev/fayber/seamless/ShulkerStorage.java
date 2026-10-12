@@ -1,5 +1,6 @@
 package dev.fayber.seamless;
 
+import dev.fayber.seamless.preview.ShulkerRules;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.NonNullList;
@@ -7,21 +8,18 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.level.block.ShulkerBoxBlock;
 
 public final class ShulkerStorage {
     private ShulkerStorage() {}
 
     public static boolean isShulker(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof BlockItem block
-            && block.getBlock() instanceof ShulkerBoxBlock;
+        return ShulkerRules.isShulker(stack);
     }
 
     public static List<ItemStack> read(ItemStack shulker) {
@@ -35,58 +33,6 @@ public final class ShulkerStorage {
 
     static void write(ItemStack shulker, List<ItemStack> items) {
         shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
-    }
-
-    // Only manipulates the server-owned carried stack and menu cursor; no client-supplied items.
-    public static void handleStorage(ServerPlayer player, StorageRequest packet) {
-        int slot = packet.inventorySlot(), inner = packet.innerSlot(), button = packet.button();
-        if (slot < 0 || slot >= 36 || inner < 0 || inner >= 27 || (button != 0 && button != 1)) return;
-        if (player.containerMenu != player.inventoryMenu) return;
-        ItemStack shulker = player.getInventory().getItem(slot);
-        if (!isShulker(shulker)) return;
-
-        List<ItemStack> contents = read(shulker);
-        ItemStack inside = contents.get(inner);
-        ItemStack carried = player.containerMenu.getCarried();
-        int takeAmount = StorageTransferAmounts.withdrawal(inside.getCount(), button);
-        SeamlessShulkers.LOGGER.debug("Preview transfer: slot {}, inside {}, button {}, stored {}, carried {}",
-                slot, inner, button, inside.getCount(), carried.getCount());
-
-        if (carried.isEmpty() && !inside.isEmpty()) {
-            ItemStack taken = inside.copyWithCount(takeAmount);
-            inside.shrink(takeAmount);
-            contents.set(inner, inside.isEmpty() ? ItemStack.EMPTY : inside);
-            player.containerMenu.setCarried(taken);
-        } else if (!carried.isEmpty() && !isShulker(carried)) {
-            int moved;
-            if (inside.isEmpty()) {
-                moved = StorageTransferAmounts.deposit(carried.getCount(), 0, carried.getMaxStackSize(), button);
-                contents.set(inner, carried.copyWithCount(moved));
-            } else {
-                if (!ItemStack.isSameItemSameComponents(inside, carried)) {
-                    // Vanilla left-click swaps two unlike stacks; right-click does nothing.
-                    if (button != 0) return;
-                    contents.set(inner, carried.copy());
-                    player.containerMenu.setCarried(inside.copy());
-                    write(shulker, contents);
-                    player.getInventory().setChanged();
-                    player.containerMenu.broadcastChanges();
-                    return;
-                }
-                moved = StorageTransferAmounts.deposit(carried.getCount(), inside.getCount(), inside.getMaxStackSize(), button);
-                if (moved <= 0) return;
-                inside.grow(moved);
-                contents.set(inner, inside);
-            }
-            carried.shrink(moved);
-            player.containerMenu.setCarried(carried.isEmpty() ? ItemStack.EMPTY : carried);
-        } else {
-            return;
-        }
-
-        write(shulker, contents);
-        player.getInventory().setChanged();
-        player.containerMenu.broadcastChanges();
     }
 
     // Server-authoritative Space trading refills. The client supplies only the selected offer index.

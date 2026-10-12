@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "seamlessshulkers-test",
+  "version": "1.0.0",
+  "name": "Seamless Shulkers tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["dev.fayber.seamless.gametest.PreviewServerGameTest"],
+    "fabric-client-gametest": ["dev.fayber.seamless.gametest.PreviewClientGameTest"]
+  }
+}

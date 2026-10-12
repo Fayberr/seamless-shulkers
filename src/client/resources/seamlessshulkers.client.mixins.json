@@ -3,13 +3,16 @@
   "package": "dev.fayber.seamless.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
+    "AbstractContainerScreenAccessor",
     "ContainerScreenMixin",
+    "RecipeBookScreenMixin",
+    "CreativeInventoryScreenMixin",
+    "ItemStackTooltipMixin",
     "MerchantScreenMixin",
     "LitematicaPickMixin",
     "LitematicaLegacyDirectMixin",
     "LitematicaRewriteDirectMixin",
-    "ClientUseOnMixin",
-    "ScreenTooltipLayerMixin"
+    "ClientUseOnMixin"
   ],
   "injectors": {
     "defaultRequire": 1

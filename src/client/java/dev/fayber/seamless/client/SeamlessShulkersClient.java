@@ -1,6 +1,14 @@
 package dev.fayber.seamless.client;
 
 import dev.fayber.seamless.RefillRequest;
+import dev.fayber.seamless.client.preview.ClientShulkerTooltip;
+import dev.fayber.seamless.client.preview.PreviewController;
+import dev.fayber.seamless.client.preview.ShulkerTooltip;
+import dev.fayber.seamless.client.preview.ShulkerTooltips;
+import dev.fayber.seamless.preview.PreviewReleased;
+import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.ClientTooltipComponentCallback;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -17,6 +25,12 @@ public final class SeamlessShulkersClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
+        ClientTooltipComponentCallback.EVENT.register(data ->
+            data instanceof ShulkerTooltip tooltip ? new ClientShulkerTooltip(tooltip) : null);
+        ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> ShulkerTooltips.lines(stack, lines));
+        ClientPlayNetworking.registerGlobalReceiver(PreviewReleased.TYPE, (payload, context) ->
+            PreviewController.onReleased(payload.token()));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> PreviewController.reset());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
             dispatcher.register(literal("seamlessshulkers").executes(ctx -> {
                 Minecraft mc = Minecraft.getInstance();
