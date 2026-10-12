@@ -66,7 +66,7 @@ Options: shulker preview on/off, editable full preview on/off, hotbar auto-refil
 
 - `gradle build` (Gradle 9.7.1, JDK 25): compiles, runs the unit tests and the server game tests.
 - `xvfb-run -a -s "-screen 0 1920x1080x24" gradle runClientGameTest`: client game test with real input, in singleplayer and on a dedicated server. Add `-PwithSbt` to run it with Shulker Box Tooltip 5.4.2 on the runtime classpath (never bundled). Screenshots land in `build/run/clientGameTest/screenshots`.
-- GitHub Actions: `Build` (publishes the JAR), `Client Game Test` (with and without Shulker Box Tooltip, uploads screenshots), `Litematica 26.3 Compatibility`, `Dedicated Server Smoke`, `Client Loader Smoke`.
+- GitHub Actions: `Build` (publishes the JAR), `Client Game Test` (manual trigger only; with and without Shulker Box Tooltip, uploads screenshots), `Litematica 26.3 Compatibility`, `Dedicated Server Smoke`, `Client Loader Smoke`.
 
 **A green build is not proof that every in-game interaction works.** Test with disposable worlds and inventories first.
 
