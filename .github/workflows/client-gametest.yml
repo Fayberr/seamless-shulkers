@@ -22,12 +22,17 @@ jobs:
         with:
           gradle-version: '9.7.1'
       - name: Install virtual display
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1
       - name: Run client game test
+        shell: bash
         run: |
+          set -o pipefail
           extra=""
           if [ "${{ matrix.sbt }}" = "true" ]; then extra="-PwithSbt"; fi
-          xvfb-run -a -s "-screen 0 1920x1080x24" gradle --no-daemon runClientGameTest $extra
+          # Minecraft 26.3 falls back to Vulkan on Mesa lavapipe when no GLX visual matches.
+          # A client without a usable backend never exits, so cap the run.
+          timeout 1200 xvfb-run -a -s "-screen 0 1920x1080x24" gradle --no-daemon runClientGameTest $extra 2>&1 | tee /tmp/client.log
+          grep -q "all preview scenarios passed" /tmp/client.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
