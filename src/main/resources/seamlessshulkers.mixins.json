@@ -7,7 +7,6 @@
     "AbstractContainerMenuAccessor",
     "AbstractContainerMenuInvoker",
     "AbstractContainerMenuMixin",
-    "InventoryMenuAccessor",
     "InventoryMenuMixin",
     "ServerClickDebugMixin"
   ],

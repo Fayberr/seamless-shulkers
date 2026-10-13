@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -27,8 +28,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.BundlePacket;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.game.ClientboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
+import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket;
 import net.minecraft.network.protocol.game.ClientboundSetCursorItemPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPlayerInventoryPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
@@ -39,24 +42,33 @@ import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Drives real {@link ServerboundContainerClickPacket}s through the vanilla server handler. A second,
- * client-mode {@link InventoryMenu} plays the client: it predicts each click exactly like
+ * client-mode menu (the inventory menu, or whatever menu the server opened, built from its menu
+ * type like the real client does) plays the client: it predicts each click exactly like
  * {@code MultiPlayerGameMode.handleContainerInput}, sends the hashed prediction, and applies every
  * packet the server sends back. After each step the test checks that the server state is what the
  * scenario expects, that the client mirror converged to it, and that no item was created or lost.
  */
 public class PreviewServerGameTest {
-    /** Inventory slot of the box in most scenarios; also its menu index (main inventory starts at 9). */
+    /** Inventory slot of the box in most scenarios; also its inventory menu index (main inventory starts at 9). */
     static final int BOX = 9;
+    /** ChestMenu (3 rows) layout: chest 0..26, main inventory 27..53, hotbar 54..62. */
+    static final int CHEST_INV = 27;
+    static final int CHEST_HOTBAR_END = 63;
 
     /** Captures everything the server sends to the test player instead of writing it to a channel. */
     static final class CapturingConnection extends Connection {
@@ -82,13 +94,15 @@ public class PreviewServerGameTest {
         }
     }
 
-    /** One server player plus the client-side mirror of its inventory menu. */
+    /** One server player plus the client-side mirror of its open menu. */
     static final class Rig {
         final GameTestHelper ctx;
         final ServerPlayer player;
         final CapturingConnection connection;
         final ServerPlayer mirrorPlayer;
-        final InventoryMenu mirror;
+        final InventoryMenu mirrorInventoryMenu;
+        /** The client's open menu: the inventory menu, or the one built for the last open-screen packet. */
+        AbstractContainerMenu mirror;
         final HashedPatchMap.HashGenerator hashes;
         int corrections;
         int token;
@@ -112,25 +126,56 @@ public class PreviewServerGameTest {
             new EmbeddedChannel(discard);
             server.getPlayerList().placeNewPlayer(discard, mirrorPlayer, mirrorCookie);
             mirrorPlayer.getInventory().clearContent();
-            mirror = new InventoryMenu(mirrorPlayer.getInventory(), false, mirrorPlayer);
+            mirrorInventoryMenu = new InventoryMenu(mirrorPlayer.getInventory(), false, mirrorPlayer);
+            mirror = mirrorInventoryMenu;
 
             DynamicOps<HashCode> ops = server.registryAccess().createSerializationContext(HashOps.CRC32C_INSTANCE);
             hashes = component -> component.encodeValue(ops).getOrThrow().asInt();
             resync();
         }
 
+        /** Preview of the server's open menu; an empty, unbound one if it has none yet. */
         ShulkerPreviewContainer serverPreview() {
-            return ((PreviewMenu) player.inventoryMenu).seamless$preview();
+            ShulkerPreviewContainer preview = ((PreviewMenu) menu()).seamless$preview();
+            return preview != null ? preview : new ShulkerPreviewContainer(true);
         }
 
-        ShulkerPreviewContainer mirrorPreview() {
+        @Nullable ShulkerPreviewContainer mirrorPreview() {
             return ((PreviewMenu) mirror).seamless$preview();
         }
 
         int first() {
-            int first = ((PreviewMenu) player.inventoryMenu).seamless$firstPreviewSlot();
-            if (first != ((PreviewMenu) mirror).seamless$firstPreviewSlot()) ctx.fail("preview slot offset differs between sides");
+            int first = ((PreviewMenu) menu()).seamless$firstPreviewSlot();
+            if (first < 0 || first != ((PreviewMenu) mirror).seamless$firstPreviewSlot()) ctx.fail("preview slot offset differs between sides");
             return first;
+        }
+
+        /** Number of slots vanilla knows about: everything before the preview slots. */
+        static int vanillaSlots(AbstractContainerMenu menu) {
+            int first = ((PreviewMenu) menu).seamless$firstPreviewSlot();
+            return first < 0 ? menu.slots.size() : first;
+        }
+
+        /** Places a chest in the test structure, stands the player next to it and opens it on both sides. */
+        ChestBlockEntity openChest(BlockPos relative) {
+            if (!(ctx.getLevel().getBlockState(ctx.absolutePos(relative)).getBlock() instanceof ChestBlock)) ctx.setBlock(relative, Blocks.CHEST);
+            ChestBlockEntity chest = ctx.getBlockEntity(relative, ChestBlockEntity.class);
+            standAt(relative);
+            open(chest);
+            return chest;
+        }
+
+        void standAt(BlockPos relative) {
+            BlockPos at = ctx.absolutePos(relative);
+            player.setPos(at.getX() + 0.5, at.getY() + 1, at.getZ() + 0.5);
+        }
+
+        void open(net.minecraft.world.MenuProvider provider) {
+            connection.sent.clear();
+            player.openMenu(provider);
+            deliver();
+            corrections = 0;
+            if (mirror.containerId != menu().containerId) ctx.fail("client did not open menu " + menu().containerId);
         }
 
         /** Server-side setup write followed by a full sync, like joining with these items. */
@@ -140,23 +185,31 @@ public class PreviewServerGameTest {
 
         void resync() {
             connection.sent.clear();
-            player.inventoryMenu.sendAllDataToRemote();
+            menu().sendAllDataToRemote();
             deliver();
             corrections = 0;
         }
 
-        /** Binds the preview on both sides the way the client controller does. Returns server acceptance. */
-        boolean bind(int inventorySlot) {
-            mirrorPreview().bind(inventorySlot);
-            return bindServerOnly(inventorySlot, mirrorPlayer.getInventory().getItem(inventorySlot));
+        /** Binds the preview of the open menu on both sides the way the client controller does. Returns server acceptance. */
+        boolean bind(int menuSlot) {
+            ItemStack claimed = menuSlot < mirror.slots.size() ? mirror.slots.get(menuSlot).getItem() : ItemStack.EMPTY;
+            int first = ((PreviewMenu) mirror).seamless$nextFirstPreviewSlot();
+            if (menuSlot < mirror.slots.size()) ((PreviewMenu) mirror).seamless$ensurePreview(false).bind(mirror.slots.get(menuSlot));
+            return request(menuSlot, first, claimed);
         }
 
-        boolean bindServerOnly(int inventorySlot, ItemStack claimed) {
+        boolean bindServerOnly(int menuSlot, ItemStack claimed) {
+            return request(menuSlot, ((PreviewMenu) mirror).seamless$nextFirstPreviewSlot(), claimed);
+        }
+
+        boolean request(int menuSlot, int first, ItemStack claimed) {
             token++;
-            PreviewServer.handleBind(player, new PreviewBindRequest(player.inventoryMenu.containerId, inventorySlot, token,
+            connection.sent.clear();
+            PreviewServer.handleBind(player, new PreviewBindRequest(mirror.containerId, menuSlot, first, token,
                 HashedStack.create(claimed, hashes)));
             boolean accepted = serverPreview().isBound() && serverPreview().token() == token;
-            if (!accepted) mirrorPreview().unbind();
+            if (!accepted && mirrorPreview() != null) mirrorPreview().unbind();
+            deliver();
             return accepted;
         }
 
@@ -193,17 +246,25 @@ public class PreviewServerGameTest {
         void apply(Packet<?> packet) {
             if (packet instanceof BundlePacket<?> bundle) {
                 for (Packet<?> sub : bundle.subPackets()) apply(sub);
+            } else if (packet instanceof ClientboundOpenScreenPacket open) {
+                mirror = open.getType().create(open.getContainerId(), mirrorPlayer.getInventory());
+            } else if (packet instanceof ClientboundContainerClosePacket close) {
+                if (close.getContainerId() == mirror.containerId) mirror = mirrorInventoryMenu;
             } else if (packet instanceof ClientboundContainerSetContentPacket content) {
                 corrections++;
-                if (content.items().size() != InventoryMenu.SHIELD_SLOT + 1) {
-                    ctx.fail("full sync carried " + content.items().size() + " slots, a vanilla client expects 46");
+                if (content.containerId() != mirror.containerId) return;
+                int expected = vanillaSlots(menu());
+                if (content.items().size() != expected) {
+                    ctx.fail("full sync carried " + content.items().size() + " slots, a vanilla client expects " + expected);
                 }
                 List<ItemStack> copies = new ArrayList<>();
                 for (ItemStack s : content.items()) copies.add(s.copy());
                 mirror.initializeContents(content.stateId(), copies, content.carriedItem().copy());
             } else if (packet instanceof ClientboundContainerSetSlotPacket set) {
                 corrections++;
-                if (set.getSlot() > InventoryMenu.SHIELD_SLOT) ctx.fail("server sent preview slot " + set.getSlot() + " over the network");
+                if (set.getContainerId() == menu().containerId && set.getSlot() >= vanillaSlots(menu())) {
+                    ctx.fail("server sent preview slot " + set.getSlot() + " over the network");
+                }
                 if (set.getContainerId() == mirror.containerId) mirror.setItem(set.getSlot(), set.getStateId(), set.getItem().copy());
             } else if (packet instanceof ClientboundSetCursorItemPacket cursor) {
                 corrections++;
@@ -215,7 +276,7 @@ public class PreviewServerGameTest {
         }
 
         AbstractContainerMenu menu() {
-            return player.inventoryMenu;
+            return player.containerMenu;
         }
 
         ItemStack server(int menuSlot) {
@@ -223,14 +284,19 @@ public class PreviewServerGameTest {
         }
 
         List<ItemStack> boxContents(int inventorySlot) {
+            return contentsOf(player.getInventory().getItem(inventorySlot));
+        }
+
+        static List<ItemStack> contentsOf(ItemStack box) {
             NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
-            player.getInventory().getItem(inventorySlot).getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items);
+            box.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items);
             return items;
         }
 
         /** Every slot, the cursor and the preview agree between server and mirror. */
         void converged(String step) {
-            for (int i = 0; i < menu().slots.size(); i++) {
+            if (mirror.containerId != menu().containerId) ctx.fail(step + ": client has menu " + mirror.containerId + " open, server " + menu().containerId);
+            for (int i = 0; i < Math.min(menu().slots.size(), mirror.slots.size()); i++) {
                 ItemStack s = menu().getSlot(i).getItem();
                 ItemStack m = mirror.getSlot(i).getItem();
                 if (!ItemStack.matches(s, m)) ctx.fail(step + ": slot " + i + " server=" + s + " client=" + m);
@@ -245,20 +311,24 @@ public class PreviewServerGameTest {
             }
         }
 
-        /** Total of an item across the inventory, the cursor and every shulker's contents. */
+        /** Total of an item across the inventory, the cursor, the open container and every shulker's contents. */
         int total(Item item) {
             int n = count(menu().getCarried(), item);
-            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-                ItemStack s = player.getInventory().getItem(i);
-                n += count(s, item);
-                ItemContainerContents c = s.get(DataComponents.CONTAINER);
-                if (c != null) for (ItemStack inner : c.itemCopies().toList()) n += count(inner, item);
+            for (int i = 0; i < player.getInventory().getContainerSize(); i++) n += count(player.getInventory().getItem(i), item);
+            if (menu() != player.inventoryMenu) {
+                for (int i = 0; i < vanillaSlots(menu()); i++) {
+                    if (menu().getSlot(i).container != player.getInventory()) n += count(menu().getSlot(i).getItem(), item);
+                }
             }
             return n;
         }
 
+        /** The stack itself plus, for a box, what it holds. */
         static int count(ItemStack s, Item item) {
-            return s.is(item) ? s.getCount() : 0;
+            int n = s.is(item) ? s.getCount() : 0;
+            ItemContainerContents c = s.get(DataComponents.CONTAINER);
+            if (c != null) for (ItemStack inner : c.itemCopies().toList()) n += inner.is(item) ? inner.getCount() : 0;
+            return n;
         }
 
         void expect(boolean condition, String message) {
@@ -399,7 +469,7 @@ public class PreviewServerGameTest {
         r.put(15, arrows(5));
         r.put(16, new ItemStack(Items.DIRT, 20));
         r.resync();
-        r.expect(r.bind(0), "bind hotbar box refused");
+        r.expect(r.bind(InventoryMenu.USE_ROW_SLOT_START), "bind hotbar box refused");
         int p = r.first();
         int arrows = r.total(Items.ARROW);
         int hotbarBox = InventoryMenu.USE_ROW_SLOT_START;
@@ -555,17 +625,33 @@ public class PreviewServerGameTest {
         r.expect(!r.bind(10), "bound a stack of two boxes");
         r.expect(!r.bind(11), "bound a box whose contents exceed 27 slots");
         r.expect(!r.bind(12), "bound a non-shulker");
-        r.expect(!r.bind(36), "bound an armor slot");
-        r.expect(!r.bind(41), "bound an invalid inventory slot");
+        r.expect(!r.bind(InventoryMenu.ARMOR_SLOT_END - 1), "bound an armor slot");
+        r.expect(!r.bindServerOnly(500, box()), "bound a slot index past the menu");
+        r.expect(!r.request(BOX, r.first() + 1, r.player.getInventory().getItem(BOX)), "bound with a wrong preview slot offset");
+        r.expect(!r.bindServerOnly(r.first(), box()), "bound a preview slot as the source");
+
+        // a box in the inventory's crafting grid is a recipe input, never editable
+        r.menu().getSlot(InventoryMenu.CRAFT_SLOT_START).set(box(arrows(4)));
+        r.resync();
+        r.expect(!r.bind(InventoryMenu.CRAFT_SLOT_START), "bound a box in the crafting grid");
+        r.menu().getSlot(InventoryMenu.CRAFT_SLOT_START).set(ItemStack.EMPTY);
+        r.resync();
 
         r.token++;
-        PreviewServer.handleBind(r.player, new PreviewBindRequest(7, BOX, r.token, HashedStack.create(r.player.getInventory().getItem(BOX), r.hashes)));
+        PreviewServer.handleBind(r.player, new PreviewBindRequest(7, BOX, r.first(), r.token, HashedStack.create(r.player.getInventory().getItem(BOX), r.hashes)));
         r.expect(!r.serverPreview().isBound(), "bound with a wrong container id");
 
+        // the client still thinks the inventory is open while the server already opened a chest
         r.player.openMenu(new SimpleMenuProvider((id, inv, pl) -> ChestMenu.threeRows(id, inv), Component.literal("chest")));
         r.expect(r.player.containerMenu != r.player.inventoryMenu, "chest did not open");
-        r.expect(!r.bind(BOX), "bound while another menu is open");
+        r.token++;
+        PreviewServer.handleBind(r.player, new PreviewBindRequest(r.player.inventoryMenu.containerId, BOX, InventoryMenu.SHIELD_SLOT + 1, r.token,
+            HashedStack.create(r.player.getInventory().getItem(BOX), r.hashes)));
+        r.expect(((PreviewMenu) r.player.containerMenu).seamless$preview() == null, "request for the inventory menu touched the chest");
+        r.expect(!((PreviewMenu) r.player.inventoryMenu).seamless$preview().isBound(), "bound a menu that is not open");
         r.player.closeContainer();
+        r.connection.sent.clear();
+        r.mirror = r.mirrorInventoryMenu;
 
         r.player.setGameMode(GameType.SPECTATOR);
         r.expect(!r.bind(BOX), "bound as spectator");
@@ -579,6 +665,8 @@ public class PreviewServerGameTest {
         r.expect(!r.serverPreview().isBound(), "refused rebind left the old binding");
         // release
         r.expect(r.bind(BOX), "bind refused");
+        PreviewServer.handleBind(r.player, PreviewBindRequest.release(0, r.token - 1));
+        r.expect(r.serverPreview().isBound(), "stale release ended the new binding");
         PreviewServer.handleBind(r.player, PreviewBindRequest.release(0, r.token));
         r.expect(!r.serverPreview().isBound(), "release ignored");
         ctx.succeed();
@@ -675,6 +763,289 @@ public class PreviewServerGameTest {
         r.expectStack(r.menu().getCarried(), Items.ARROW, 18, "picked the refilled remainder");
         r.expect(r.total(Items.ARROW) == total, "arrows not conserved");
         org.spongepowered.asm.mixin.MixinEnvironment.getCurrentEnvironment().audit();
+        ctx.succeed();
+    }
+
+    /** A box in the player's inventory, edited while a chest is open: to the chest and back, Shift-click both ways. */
+    @GameTest(maxTicks = 100)
+    public void chestWithBoxInInventory(GameTestHelper ctx) {
+        Rig r = new Rig(ctx);
+        r.put(BOX, box(arrows(12), arrows(17), new ItemStack(Items.STONE, 5)));
+        r.put(10, new ItemStack(Items.FLINT, 7));
+        ChestBlockEntity chest = r.openChest(new BlockPos(1, 1, 1));
+        chest.setItem(4, new ItemStack(Items.DIRT, 20));
+        r.resync();
+        int boxSlot = CHEST_INV;
+        r.expect(r.bind(boxSlot), "bind of an inventory box while a chest is open refused");
+        int p = r.first();
+        r.expect(p == CHEST_HOTBAR_END, "preview slots should follow the 63 chest menu slots, start=" + p);
+        int arrows = r.total(Items.ARROW);
+
+        // pick up from the panel, put into the chest
+        r.noCorrections(r.click(p, 0, ContainerInput.PICKUP), "pick");
+        r.noCorrections(r.click(0, 0, ContainerInput.PICKUP), "into chest");
+        r.expectStack(chest.getItem(0), Items.ARROW, 12, "chest got the arrows");
+        r.expectStack(r.boxContents(BOX).get(0), Items.ARROW, 0, "box gave the arrows");
+        r.converged("pick and place");
+
+        // Shift-click in the panel sends the stack to the chest, merging first
+        r.noCorrections(r.click(p + 1, 0, ContainerInput.QUICK_MOVE), "shift panel to chest");
+        r.expectStack(chest.getItem(0), Items.ARROW, 29, "merged into the chest stack");
+        r.expectStack(r.boxContents(BOX).get(1), Items.ARROW, 0, "box slot emptied");
+        r.converged("shift panel");
+
+        // Shift-click on a chest slot goes to the player's inventory, never into the bound box
+        r.noCorrections(r.click(4, 0, ContainerInput.QUICK_MOVE), "shift chest");
+        r.expectStack(chest.getItem(4), Items.DIRT, 0, "dirt left the chest");
+        r.expectStack(r.server(CHEST_HOTBAR_END - 1), Items.DIRT, 20, "dirt in the hotbar, rightmost first");
+        for (ItemStack inner : r.boxContents(BOX)) r.expect(!inner.is(Items.DIRT), "chest Shift-click went into the box");
+        r.converged("shift chest");
+
+        // Shift-click on an inventory slot goes to the chest as in vanilla
+        r.noCorrections(r.click(CHEST_INV + 1, 0, ContainerInput.QUICK_MOVE), "shift inventory");
+        r.expectStack(chest.getItem(1), Items.FLINT, 7, "flint into the chest");
+        for (ItemStack inner : r.boxContents(BOX)) r.expect(!inner.is(Items.FLINT), "inventory Shift-click went into the box");
+        r.converged("shift inventory");
+
+        // and a chest item can be put into the box by hand
+        r.noCorrections(r.click(1, 0, ContainerInput.PICKUP), "pick flint");
+        r.noCorrections(r.click(p + 8, 0, ContainerInput.PICKUP), "flint into box");
+        r.expectStack(r.boxContents(BOX).get(8), Items.FLINT, 7, "flint stored in the box");
+        r.converged("chest to box");
+
+        r.expect(r.total(Items.ARROW) == arrows, "arrows not conserved: " + r.total(Items.ARROW) + " != " + arrows);
+        r.expect(r.total(Items.FLINT) == 7 && r.total(Items.DIRT) == 20 && r.total(Items.STONE) == 5, "items not conserved");
+
+        // Drag one cursor stack across the box, chest and player inventory.
+        r.noCorrections(r.click(0, 0, ContainerInput.PICKUP), "pick arrows for chest drag");
+        r.noCorrections(r.click(-999, AbstractContainerMenu.getQuickcraftMask(0, 0), ContainerInput.QUICK_CRAFT), "chest drag start");
+        for (int target : new int[] {p, 2, CHEST_INV + 2}) {
+            r.noCorrections(r.click(target, AbstractContainerMenu.getQuickcraftMask(1, 0), ContainerInput.QUICK_CRAFT), "chest drag add");
+        }
+        r.noCorrections(r.click(-999, AbstractContainerMenu.getQuickcraftMask(2, 0), ContainerInput.QUICK_CRAFT), "chest drag end");
+        r.expectStack(r.boxContents(BOX).get(0), Items.ARROW, 9, "drag box share");
+        r.expectStack(r.server(2), Items.ARROW, 9, "drag chest share");
+        r.expectStack(r.server(CHEST_INV + 2), Items.ARROW, 9, "drag inventory share");
+        r.expectStack(r.menu().getCarried(), Items.ARROW, 2, "drag remainder");
+        r.noCorrections(r.click(-999, AbstractContainerMenu.getQuickcraftMask(0, 1), ContainerInput.QUICK_CRAFT), "chest right drag start");
+        for (int target : new int[] {p + 4, 3}) {
+            r.noCorrections(r.click(target, AbstractContainerMenu.getQuickcraftMask(1, 1), ContainerInput.QUICK_CRAFT), "chest right drag add");
+        }
+        r.noCorrections(r.click(-999, AbstractContainerMenu.getQuickcraftMask(2, 1), ContainerInput.QUICK_CRAFT), "chest right drag end");
+        r.expectStack(r.boxContents(BOX).get(4), Items.ARROW, 1, "right drag box share");
+        r.expectStack(r.server(3), Items.ARROW, 1, "right drag chest share");
+        r.expect(r.menu().getCarried().isEmpty() && r.total(Items.ARROW) == arrows, "chest drag lost arrows");
+        r.converged("cross-container drags");
+
+        // closing the chest ends the binding
+        r.player.closeContainer();
+        r.deliver();
+        r.expect(r.mirror == r.mirrorInventoryMenu, "client did not close the chest");
+        ctx.succeed();
+    }
+
+    /** A box lying in a chest: take items out to the inventory, Shift-click out, put items in; the chest keeps the edit. */
+    @GameTest(maxTicks = 100)
+    public void chestWithBoxInside(GameTestHelper ctx) {
+        Rig r = new Rig(ctx);
+        r.put(12, new ItemStack(Items.FLINT, 9));
+        ChestBlockEntity chest = r.openChest(new BlockPos(1, 1, 1));
+        chest.setItem(3, box(arrows(12), new ItemStack(Items.STONE, 5)));
+        r.resync();
+        r.expect(r.bind(3), "bind of a box in the chest refused");
+        int p = r.first();
+        ShulkerPreviewContainer bound = r.serverPreview();
+        int arrows = r.total(Items.ARROW);
+
+        r.noCorrections(r.click(p, 0, ContainerInput.PICKUP), "pick");
+        r.noCorrections(r.click(CHEST_INV + 4, 0, ContainerInput.PICKUP), "into inventory");
+        r.expectStack(r.player.getInventory().getItem(12), Items.FLINT, 9, "flint untouched");
+        r.expectStack(r.server(CHEST_INV + 4), Items.ARROW, 12, "arrows in the inventory");
+        r.expectStack(Rig.contentsOf(chest.getItem(3)).get(0), Items.ARROW, 0, "box in the chest gave the arrows");
+        r.converged("pick and place");
+
+        // Shift-click in the panel moves to the player's inventory, hotbar from the right first
+        r.noCorrections(r.click(p + 1, 0, ContainerInput.QUICK_MOVE), "shift out");
+        r.expectStack(r.server(CHEST_HOTBAR_END - 1), Items.STONE, 5, "stone in the hotbar");
+        r.expectStack(Rig.contentsOf(chest.getItem(3)).get(1), Items.STONE, 0, "stone left the box");
+        r.converged("shift out");
+
+        // put the arrows back into the box by hand
+        r.noCorrections(r.click(CHEST_INV + 4, 0, ContainerInput.PICKUP), "pick arrows back");
+        r.noCorrections(r.click(p + 6, 0, ContainerInput.PICKUP), "arrows into box");
+        r.expectStack(Rig.contentsOf(chest.getItem(3)).get(6), Items.ARROW, 12, "arrows stored in the box in the chest");
+        r.converged("into box");
+
+        // Shift-click on an inventory slot goes into the chest, not into the box
+        r.noCorrections(r.click(CHEST_INV + 3, 0, ContainerInput.QUICK_MOVE), "shift flint");
+        r.expectStack(chest.getItem(0), Items.FLINT, 9, "flint went to the chest");
+        for (ItemStack inner : Rig.contentsOf(chest.getItem(3))) r.expect(!inner.is(Items.FLINT), "flint went into the box");
+        r.converged("shift inventory");
+        r.expect(r.total(Items.ARROW) == arrows, "arrows not conserved");
+
+        // a hopper (or anything else) pulls the box out of the chest: the binding dies and clicks do nothing
+        ItemStack pulled = chest.removeItem(3, 1);
+        r.expect(pulled.is(Items.SHULKER_BOX), "box not pulled");
+        r.expect(!bound.isBound(), "binding survived the box leaving the chest");
+        r.menu().broadcastChanges();
+        r.deliver();
+        r.click(p + 6, 0, ContainerInput.PICKUP);
+        r.expect(r.menu().getCarried().isEmpty(), "picked up from a box that left the chest");
+        r.converged("box pulled");
+        r.expect(Rig.count(pulled, Items.ARROW) == 12, "the pulled box lost its contents");
+
+        // closing the chest releases the preview of that menu
+        chest.setItem(3, pulled);
+        r.resync();
+        r.expect(r.bind(3), "rebind refused");
+        r.player.closeContainer();
+        r.deliver();
+        r.expect(!bound.isBound(), "closing the chest kept the binding");
+        ctx.succeed();
+    }
+
+    /** The ender chest is storage too. */
+    @GameTest(maxTicks = 100)
+    public void enderChestBox(GameTestHelper ctx) {
+        Rig r = new Rig(ctx);
+        r.player.getEnderChestInventory().setItem(0, box(arrows(30)));
+        r.open(new SimpleMenuProvider((id, inv, pl) -> ChestMenu.threeRows(id, inv, pl.getEnderChestInventory()), Component.literal("ender")));
+        r.expect(r.bind(0), "bind of a box in the ender chest refused");
+        int p = r.first();
+        r.noCorrections(r.click(p, 0, ContainerInput.QUICK_MOVE), "shift out");
+        r.expectStack(r.server(CHEST_HOTBAR_END - 1), Items.ARROW, 30, "arrows in the hotbar");
+        r.expectStack(Rig.contentsOf(r.player.getEnderChestInventory().getItem(0)).get(0), Items.ARROW, 0, "ender chest box emptied");
+        r.converged("ender");
+        ctx.succeed();
+    }
+
+    /** Recipe inputs and containers that are not storage stay display-only; inventory boxes still bind there. */
+    @GameTest(maxTicks = 100)
+    public void containerRefusals(GameTestHelper ctx) {
+        Rig r = new Rig(ctx);
+        r.put(BOX, box(arrows(5)));
+        BlockPos table = new BlockPos(2, 1, 2);
+        ctx.setBlock(table, Blocks.CRAFTING_TABLE);
+        r.standAt(table);
+        BlockPos at = ctx.absolutePos(table);
+        r.open(new SimpleMenuProvider((id, inv, pl) -> new CraftingMenu(id, inv, ContainerLevelAccess.create(ctx.getLevel(), at)),
+            Component.literal("table")));
+        r.menu().getSlot(1).set(box(arrows(3)));
+        r.resync();
+        r.expect(!r.bind(1), "bound a box in the crafting grid");
+        r.expect(((PreviewMenu) r.menu()).seamless$preview() == null, "a refused bind added preview slots on the server");
+        // the crafting menu's inventory slots start at 10
+        r.expect(r.bind(10), "an inventory box in a crafting table screen must still bind");
+        int p = r.first();
+        r.noCorrections(r.click(p, 0, ContainerInput.PICKUP), "pick in crafting screen");
+        r.noCorrections(r.click(p, 0, ContainerInput.PICKUP), "put back");
+        r.converged("crafting");
+        r.player.closeContainer();
+        r.deliver();
+
+        // a menu over a plain, non-persistent container
+        r.open(new SimpleMenuProvider((id, inv, pl) -> ChestMenu.threeRows(id, inv), Component.literal("scratch")));
+        r.menu().getSlot(0).set(box(arrows(2)));
+        r.resync();
+        r.expect(!r.bind(0), "bound a box in a non-storage container");
+        r.expect(r.bind(CHEST_INV), "inventory box refused in a plain chest menu");
+
+        // a preview offset the server would not use is refused
+        r.player.closeContainer();
+        r.deliver();
+        ChestBlockEntity chest = r.openChest(new BlockPos(1, 1, 1));
+        chest.setItem(0, box(arrows(1)));
+        r.resync();
+        r.expect(!r.request(0, CHEST_HOTBAR_END + 1, chest.getItem(0)), "bound with a wrong preview offset");
+        r.expect(!r.bindServerOnly(0, box(arrows(2))), "bound with a hash of a different box");
+        r.expect(r.bind(0), "valid chest bind refused");
+        ctx.succeed();
+    }
+
+    /** Real storage menus with different slot ranges and placement restrictions. */
+    @GameTest(maxTicks = 100)
+    public void storageMenuRouting(GameTestHelper ctx) {
+        Rig r = new Rig(ctx);
+        BlockPos pos = new BlockPos(2, 1, 2);
+        for (var block : List.of(Blocks.BARREL, Blocks.HOPPER, Blocks.DISPENSER, Blocks.FURNACE, Blocks.SHULKER_BOX)) {
+            ctx.setBlock(pos, block);
+            r.standAt(pos);
+            var holder = ctx.getLevel().getBlockEntity(ctx.absolutePos(pos));
+            r.put(BOX, box(arrows(12)));
+            r.open((net.minecraft.world.MenuProvider) holder);
+            r.resync();
+            int boxSlot = -1;
+            for (var slot : r.menu().slots) {
+                if (slot.container == r.player.getInventory() && slot.getContainerSlot() == BOX) boxSlot = slot.index;
+            }
+            r.expect(boxSlot >= 0 && r.bind(boxSlot), "inventory box refused in " + block);
+            int p = r.first();
+            r.noCorrections(r.click(p, 0, ContainerInput.QUICK_MOVE), "quick-move into " + block);
+            r.expectStack(r.server(0), Items.ARROW, 12, "contents moved into " + block);
+            r.expectStack(r.boxContents(BOX).get(0), Items.ARROW, 0, "box emptied in " + block);
+            if (block == Blocks.FURNACE) {
+                r.expect(r.server(1).isEmpty() && r.server(2).isEmpty(), "arrows entered furnace fuel/result slots");
+            }
+            r.noCorrections(r.click(0, 0, ContainerInput.PICKUP), "pickup from " + block);
+            r.noCorrections(r.click(p, 0, ContainerInput.PICKUP), "return into box in " + block);
+            r.converged("storage routing " + block);
+            r.player.closeContainer();
+            r.deliver();
+
+            // A placed shulker rejects a shulker item; the other storage blocks allow one.
+            if (block != Blocks.SHULKER_BOX) {
+                ((net.minecraft.world.Container) holder).setItem(0, box(arrows(7)));
+                r.open((net.minecraft.world.MenuProvider) holder);
+                r.resync();
+                r.expect(r.bind(0), "storage box refused in " + block);
+                r.noCorrections(r.click(r.first(), 0, ContainerInput.QUICK_MOVE), "storage box to player in " + block);
+                r.expectStack(Rig.contentsOf(((net.minecraft.world.Container) holder).getItem(0)).get(0), Items.ARROW, 0,
+                    "storage box emptied in " + block);
+                r.converged("stored box " + block);
+                r.player.closeContainer();
+                r.deliver();
+            }
+        }
+        ctx.succeed();
+    }
+
+    /** Two players at one chest: if the other player takes the box, the first one's binding dies. */
+    @GameTest(maxTicks = 100)
+    public void twoPlayersOneChest(GameTestHelper ctx) {
+        Rig a = new Rig(ctx);
+        Rig b = new Rig(ctx);
+        BlockPos pos = new BlockPos(1, 1, 1);
+        ChestBlockEntity chest = a.openChest(pos);
+        b.openChest(pos);
+        chest.setItem(5, box(arrows(20)));
+        a.resync();
+        b.resync();
+        a.expect(a.bind(5), "player A bind refused");
+        b.expect(b.bind(5), "player B bind of the same box refused");
+        int p = a.first();
+
+        // A takes half, B sees the change through the box component
+        a.noCorrections(a.click(p, 1, ContainerInput.PICKUP), "A split");
+        a.expectStack(a.menu().getCarried(), Items.ARROW, 10, "A cursor");
+        b.menu().broadcastChanges();
+        b.deliver();
+        b.converged("B sees A's edit");
+        b.expectStack(b.server(p), Items.ARROW, 10, "B preview reflects A's edit");
+        a.noCorrections(a.click(CHEST_INV, 0, ContainerInput.PICKUP), "A puts down");
+
+        // B takes the box out of the chest
+        b.noCorrections(b.click(5, 0, ContainerInput.PICKUP), "B picks the box");
+        b.noCorrections(b.click(CHEST_INV + 5, 0, ContainerInput.PICKUP), "B stores the box");
+        a.menu().broadcastChanges();
+        a.deliver();
+        a.expect(!a.serverPreview().isBound(), "A's binding survived the box leaving the chest");
+        a.click(p, 0, ContainerInput.PICKUP);
+        a.expect(a.menu().getCarried().isEmpty(), "A took from a box B now holds");
+        a.converged("A after B took the box");
+        int total = a.total(Items.ARROW) + b.total(Items.ARROW) - Rig.count(chest.getItem(5), Items.ARROW);
+        a.expect(Rig.count(b.player.getInventory().getItem(14), Items.ARROW) == 10, "B's box holds the rest");
+        a.expect(a.total(Items.ARROW) == 10, "A keeps the 10 arrows it took");
+        a.expect(total == 20, "arrows not conserved across both players: " + total);
         ctx.succeed();
     }
 }

@@ -2,7 +2,7 @@
 
 Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both client and dedicated-server functionality.
 
-**Status: pre-release (0.1.0-alpha.7).** `gradle build` runs unit tests and server-side game tests of every preview interaction. A client game test drives the real inventory screen with mouse and keyboard input in singleplayer and on a dedicated server, with and without Shulker Box Tooltip. See [TESTING.md](TESTING.md) for what is automated and what still needs hands-on verification.
+**Status: pre-release (0.1.0-alpha.8).** `gradle build` runs unit tests and server-side game tests of every preview interaction. A client game test drives the real inventory screen with mouse and keyboard input in singleplayer and on a dedicated server, with and without Shulker Box Tooltip. See [TESTING.md](TESTING.md) for what is automated and what still needs hands-on verification.
 
 ## Features
 
@@ -26,17 +26,17 @@ Fabric mod for **Minecraft 26.3** (Java 25). A single mod JAR provides both clie
 | C | Hold Shift + Alt | Full 9x3 grid in original slot order. It stays where it opened while the cursor moves into it |
 
 - **Left Control** locks the open panel, so Shift and Alt can be released. While Shift and Alt are still held, clicks stay normal clicks; once Alt is released, Shift-click on a locked panel is a quick move. Press Control again to unlock and close it. Without Shulker Box Tooltip, Control in State B locks the compact preview.
-- The State C panel is **interactive** in the player inventory screen (survival and adventure) when the server has the mod. In every other screen (chests, creative), and on servers without the mod, it is display-only.
+- The State C panel is **interactive** in survival/adventure inventory and container screens when the server has the same mod version. Edit a box in your own inventory or inside opened storage, and transfer items between the panel and either inventory. Creative and servers without the compatible mod remain display-only. Boxes in recipe inputs or result slots are display-only; your own inventory boxes still work in those screens.
 
 ### Interacting with the full preview
 
-The 27 preview cells are real inventory menu slots while the panel is bound, so every gesture is ordinary vanilla inventory behavior, predicted on the client and applied by the server:
+The 27 preview cells are real slots of the open menu while the panel is bound, so every gesture is ordinary vanilla inventory behavior, predicted on the client and applied by the server:
 
 - Left-click: take a stack, deposit, merge or swap with the carried stack.
 - Right-click: take half (rounded up), or place one item.
 - Drag with left or right button: distribute evenly, or one each, across preview cells and normal inventory slots in the same gesture.
 - Double-click: collect matching items from both inventories.
-- Shift-click: move a stack out of the box into the inventory, or (while bound) from the inventory into the box. Other shulker boxes keep the vanilla inventory/hotbar route, since they cannot be stored.
+- Shift-click: move a stack out of the box into the inventory, or (while bound) from the inventory into the box. In container screens, preview stacks move to the opposite inventory: into the container for a box in your inventory, or into your inventory for a box in storage. Destination placement rules apply, with container slots filled in order. Normal slots retain their vanilla quick-move behavior. Other shulker boxes cannot be stored in the preview.
 - Number keys: swap with the hotbar (the offhand key uses the same vanilla swap). Swapping the box into itself is refused.
 
 Clicks on the panel never reach the slots behind it. The rest of the inventory stays usable while the panel is open.
@@ -47,7 +47,7 @@ Shulker Box Tooltip is optional. When it is installed it owns States A and B (it
 
 ### Server safety
 
-All inventory changes are made by the server. A panel binding names the inventory slot and a hash of the exact box the client sees. The server refuses it if the box differs, is stacked, is not a shulker, sits in an armor slot or the offhand, if another container is open, or if the player is a spectator. A binding ends as soon as that box changes or moves, and old release packets carry tokens so they cannot end a newer binding. Stale or forged clicks are corrected with a full resync. Item components (names, damage, enchantments) are preserved, and shulker boxes cannot be put inside the box.
+All inventory changes are made by the server. A panel binding names the open menu, source slot, preview slot offset and a hash of the exact box the client sees. The server refuses it if the box differs, is stacked, is not a shulker, sits in an armor or recipe slot, if the menu is no longer open or valid, or if the player is a spectator. A binding ends as soon as that box changes or moves, and old release packets carry tokens so they cannot end a newer binding. Stale or forged clicks are corrected with a full resync. Item components (names, damage, enchantments) are preserved, and shulker boxes cannot be put inside the box.
 
 ## Configuration libraries
 
@@ -70,7 +70,7 @@ Options: shulker preview on/off, editable full preview on/off, hotbar auto-refil
 
 ### Debug build
 
-`gradle build -PdebugBuild` (or the `seamless-shulkers-debug-jar` CI artifact) produces `seamless-shulkers-<version>-debug.jar`. It writes every mouse button, every container click the client sends and predicts, every server correction, the panel's open/lock/bind/release decisions, and the server's handling of each click to `logs/latest.log` with the prefix `[SS-DEBUG]`, plus the list of loaded mods at startup. The same trace can be enabled in a release JAR with the JVM flag `-Dseamlessshulkers.debug=true`. Use it only for diagnosis; it logs a lot.
+`gradle build -PdebugBuild` (or the `seamless-shulkers-debug-jar` CI artifact) produces `seamless-shulkers-<version>-debug.jar`. It writes every mouse button, every container click the client sends and predicts, every server correction, the panel's open/lock/bind/release decisions, and the server's handling of each click to `logs/latest.log` with the prefix `[SS-DEBUG]`, plus the loaded mods and preview settings at startup and settings saves. While Shift+Alt is held, a disabled preview setting is identified on screen and in the log. The same trace can be enabled in a release JAR with the JVM flag `-Dseamlessshulkers.debug=true`. Use it only for diagnosis; it logs a lot.
 
 **A green build is not proof that every in-game interaction works.** Test with disposable worlds and inventories first.
 

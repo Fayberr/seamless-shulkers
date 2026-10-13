@@ -19,6 +19,7 @@ public final class ClientOptions {
     public boolean safeDirectPlacement = true;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson COMPACT = new Gson();
     private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("seamless-shulkers.json");
     public static ClientOptions INSTANCE = load();
 
@@ -36,6 +37,11 @@ public final class ClientOptions {
         } catch (Exception ignored) {}
         return new ClientOptions();
     }
+    /** One-line form for the debug log. */
+    public String describe() {
+        return COMPACT.toJson(this);
+    }
+
     public void save() {
         refillAtOrBelow = Math.max(0, Math.min(63, refillAtOrBelow));
         refillUpTo = Math.max(1, Math.min(64, refillUpTo));
@@ -43,6 +49,7 @@ public final class ClientOptions {
         try {
             Files.createDirectories(PATH.getParent());
             Files.writeString(PATH, GSON.toJson(this), StandardCharsets.UTF_8);
+            dev.fayber.seamless.debug.PreviewDebug.log("client: options saved {}", describe());
         } catch (Exception e) {
             System.err.println("Seamless Shulkers: Unable to save config: " + e);
         }

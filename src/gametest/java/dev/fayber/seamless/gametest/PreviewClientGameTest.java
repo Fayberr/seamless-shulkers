@@ -6,6 +6,8 @@ import dev.fayber.seamless.client.mixin.AbstractContainerScreenAccessor;
 import dev.fayber.seamless.client.preview.PreviewController;
 import dev.fayber.seamless.client.preview.ShulkerTooltip;
 import dev.fayber.seamless.preview.PreviewMenu;
+import dev.fayber.seamless.preview.ShulkerPreviewContainer;
+import dev.fayber.seamless.preview.ShulkerPreviewSlot;
 import java.util.List;
 import java.util.Optional;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -19,9 +21,12 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -32,6 +37,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
  * End-to-end check with the real client, real input events and a real server connection, once in
@@ -52,6 +59,7 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         try (TestSingleplayerContext world = c.worldBuilder().create()) {
             world.getConnection().waitForChunksRender();
             scenario(c, world.getServer(), world.getConnection(), (SBT ? "sbt-" : "") + "singleplayer");
+            chestScenario(c, world.getServer(), world.getConnection(), (SBT ? "sbt-" : "") + "singleplayer");
             // /seamlessshulkers opens the settings screen (built-in, Cloth or Modern Config, whichever is installed)
             c.runOnClient(mc -> mc.getConnection().sendCommand("seamlessshulkers"));
             c.waitFor(mc -> mc.gui.screen() instanceof SettingsScreen
@@ -63,6 +71,7 @@ public class PreviewClientGameTest implements FabricClientGameTest {
             try (TestDedicatedServerConnection connection = server.connect()) {
                 connection.waitForChunksRender();
                 scenario(c, server, connection, (SBT ? "sbt-" : "") + "dedicated");
+                chestScenario(c, server, connection, (SBT ? "sbt-" : "") + "dedicated");
             }
         }
         System.out.println("[SeamlessShulkers client test] all preview scenarios passed in singleplayer and on a dedicated server"
@@ -279,6 +288,105 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         System.out.println("[SeamlessShulkers client test] " + tag + " passed");
     }
 
+    /** ChestMenu (3 rows) layout: chest 0..26, main inventory 27..53, hotbar 54..62. */
+    static final int CHEST_INV = 27;
+    static final int CHEST_HOTBAR_END = 63;
+    static final int CHEST_BOX = 3;
+
+    /**
+     * The pinned panel in a chest screen, both ways: a box lying in the chest is emptied into the
+     * player's inventory, a box in the player's inventory into the chest, by click and by Shift-click.
+     */
+    static void chestScenario(ClientGameTestContext c, TestServerContext server, TestServerConnection conn, String tag) {
+        TestInput input = c.getInput();
+        server.runOnServer(s -> {
+            ServerPlayer p = player(s);
+            p.getInventory().clearContent();
+            p.getInventory().setItem(BOX, box());
+            BlockPos pos = p.blockPosition().above(2);
+            p.level().setBlock(pos, Blocks.CHEST.defaultBlockState(), 3);
+            ChestBlockEntity chest = (ChestBlockEntity) p.level().getBlockEntity(pos);
+            chest.clearContent();
+            chest.setItem(CHEST_BOX, box());
+            p.openMenu(chest);
+        });
+        c.waitForScreen(ContainerScreen.class);
+        sync(c, conn);
+        int arrows = serverTotal(server, Items.ARROW);
+        check(arrows == 150, tag + ": chest setup arrows " + arrows);
+
+        // box lying in the chest: pick from the panel, put into the inventory
+        hoverSlot(c, CHEST_BOX);
+        input.holdShift();
+        input.holdAlt();
+        c.waitTicks(3);
+        PreviewController.State state = c.computeOnClient(mc -> PreviewController.state());
+        check(state != null && state.full() && state.interactive(), tag + ": chest box pin not interactive: " + state);
+        server.waitFor(s -> serverBound(s), 100);
+        c.takeScreenshot(tag + "-chest-box-in-chest");
+        int[] free = freeSlots(c, 1, CHEST_INV, CHEST_HOTBAR_END);
+        clickCell(c, 0, LEFT);
+        clickSlot(c, free[0], LEFT);
+        sync(c, conn);
+        check(serverSlot(server, free[0]).is(Items.ARROW) && serverSlot(server, free[0]).getCount() == 12,
+            tag + ": arrows from the chest box did not reach the inventory: " + serverSlot(server, free[0]));
+        check(serverContents(server, CHEST_BOX).get(0).isEmpty(), tag + ": chest box still has the arrows");
+
+        // locked, Shift-click a panel cell: the stack goes to the player's inventory
+        input.pressKey(InputConstants.KEY_LCONTROL);
+        input.releaseAlt();
+        input.releaseShift();
+        c.waitTicks(3);
+        input.holdShift();
+        modClick(c, 3, MOD_SHIFT);
+        input.releaseShift();
+        sync(c, conn);
+        check(serverContents(server, CHEST_BOX).get(3).isEmpty(), tag + ": Shift-click did not move the stone out of the chest box");
+        check(serverSlot(server, CHEST_HOTBAR_END - 1).is(Items.STONE), tag + ": stone not in the hotbar: " + serverSlot(server, CHEST_HOTBAR_END - 1));
+        input.pressKey(InputConstants.KEY_LCONTROL);
+        c.waitTicks(3);
+        sync(c, conn);
+        check(c.computeOnClient(mc -> PreviewController.state()) == null, tag + ": unlock in the chest did not close the panel");
+        check(!server.computeOnServer(PreviewClientGameTest::serverBound), tag + ": chest binding not released");
+
+        // box in the player's inventory: pick from the panel, put into the chest
+        hoverSlot(c, CHEST_INV);
+        input.holdShift();
+        input.holdAlt();
+        c.waitTicks(3);
+        state = c.computeOnClient(mc -> PreviewController.state());
+        check(state != null && state.interactive(), tag + ": inventory box pin in the chest screen not interactive: " + state);
+        server.waitFor(s -> serverBound(s), 100);
+        c.takeScreenshot(tag + "-chest-box-in-inventory");
+        int[] chestFree = freeSlots(c, 1, 0, CHEST_INV);
+        clickCell(c, 1, LEFT);
+        clickSlot(c, chestFree[0], LEFT);
+        sync(c, conn);
+        check(serverSlot(server, chestFree[0]).getCount() == 17, tag + ": arrows did not reach the chest: " + serverSlot(server, chestFree[0]));
+        check(serverBox(server).get(1).isEmpty(), tag + ": inventory box still has the arrows");
+
+        // locked, Shift-click a panel cell: the stack goes into the chest, merging with the 17
+        input.pressKey(InputConstants.KEY_LCONTROL);
+        input.releaseAlt();
+        input.releaseShift();
+        c.waitTicks(3);
+        input.holdShift();
+        modClick(c, 2, MOD_SHIFT);
+        input.releaseShift();
+        sync(c, conn);
+        check(serverSlot(server, chestFree[0]).getCount() == 63 && serverBox(server).get(2).isEmpty(),
+            tag + ": Shift-click did not move into the chest: chest " + serverSlot(server, chestFree[0]) + " box " + serverBox(server).get(2));
+        check(serverTotal(server, Items.ARROW) == arrows, tag + ": arrows not conserved in the chest " + serverTotal(server, Items.ARROW));
+        check(serverTotal(server, Items.STONE) == 10, tag + ": stone not conserved in the chest");
+        input.pressKey(InputConstants.KEY_LCONTROL);
+        c.waitTicks(3);
+        sync(c, conn);
+        check(!server.computeOnServer(PreviewClientGameTest::serverBound), tag + ": inventory box binding not released");
+        c.setScreen(() -> null);
+        c.waitTicks(2);
+        System.out.println("[SeamlessShulkers client test] " + tag + " chest passed");
+    }
+
     // ---------------------------------------------------------------- client helpers
 
     static void sync(ClientGameTestContext c, TestServerConnection conn) {
@@ -293,11 +401,11 @@ public class PreviewClientGameTest implements FabricClientGameTest {
     }
 
     static ItemStack clientCarried(ClientGameTestContext c) {
-        return c.computeOnClient(mc -> mc.player.inventoryMenu.getCarried().copy());
+        return c.computeOnClient(mc -> mc.player.containerMenu.getCarried().copy());
     }
 
-    static InventoryScreen screen(Minecraft mc) {
-        if (!(mc.gui.screen() instanceof InventoryScreen screen)) throw new AssertionError("inventory screen closed: " + mc.gui.screen());
+    static AbstractContainerScreen<?> screen(Minecraft mc) {
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen<?> screen)) throw new AssertionError("container screen closed: " + mc.gui.screen());
         return screen;
     }
 
@@ -311,8 +419,8 @@ public class PreviewClientGameTest implements FabricClientGameTest {
     }
 
     static int[] slotCenter(Minecraft mc, int menuSlot) {
-        InventoryScreen screen = screen(mc);
-        Slot slot = mc.player.inventoryMenu.getSlot(menuSlot);
+        AbstractContainerScreen<?> screen = screen(mc);
+        Slot slot = screen.getMenu().getSlot(menuSlot);
         AbstractContainerScreenAccessor pos = (AbstractContainerScreenAccessor) screen;
         return new int[] {pos.seamless$leftPos() + slot.x + 8, pos.seamless$topPos() + slot.y + 8};
     }
@@ -364,9 +472,9 @@ public class PreviewClientGameTest implements FabricClientGameTest {
     static void modClickSlot(ClientGameTestContext c, int menuSlot, int modifiers) {
         moveToSlot(c, menuSlot);
         c.runOnClient(mc -> {
-            InventoryScreen screen = screen(mc);
+            AbstractContainerScreen<?> screen = screen(mc);
             AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) screen;
-            Slot slot = mc.player.inventoryMenu.getSlot(menuSlot);
+            Slot slot = screen.getMenu().getSlot(menuSlot);
             MouseButtonEvent event = new MouseButtonEvent(accessor.seamless$leftPos() + slot.x + 8.5, accessor.seamless$topPos() + slot.y + 8.5,
                 new MouseButtonInfo(1, modifiers));
             screen.mouseClicked(event, false);
@@ -389,12 +497,17 @@ public class PreviewClientGameTest implements FabricClientGameTest {
 
     /** Empty main-inventory slots that the pinned panel does not cover. */
     static int[] freeSlots(ClientGameTestContext c, int n) {
+        return freeSlots(c, n, 9, 45);
+    }
+
+    /** Empty menu slots in [from, to) that the pinned panel does not cover. */
+    static int[] freeSlots(ClientGameTestContext c, int n, int from, int to) {
         int[] found = c.computeOnClient(mc -> {
-            InventoryScreen screen = screen(mc);
+            AbstractContainerScreen<?> screen = screen(mc);
             int[] result = new int[n];
             int count = 0;
-            for (int menuSlot = 9; menuSlot < 45 && count < n; menuSlot++) {
-                if (menuSlot == BOX || mc.player.inventoryMenu.getSlot(menuSlot).hasItem()) continue;
+            for (int menuSlot = from; menuSlot < to && count < n; menuSlot++) {
+                if (menuSlot == BOX && to == 45 || screen.getMenu().getSlot(menuSlot).hasItem()) continue;
                 int[] at = slotCenter(mc, menuSlot);
                 boolean covered = false;
                 for (int dx = -7; dx <= 7 && !covered; dx += 7) {
@@ -402,7 +515,7 @@ public class PreviewClientGameTest implements FabricClientGameTest {
                 }
                 if (!covered) result[count++] = menuSlot;
             }
-            if (count < n) throw new AssertionError("only " + count + " inventory slots are outside the panel");
+            if (count < n) throw new AssertionError("only " + count + " free slots in " + from + ".." + to + " are outside the panel");
             return result;
         });
         return found;
@@ -414,8 +527,10 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         return s.getPlayerList().getPlayers().get(0);
     }
 
+    /** The preview of the player's open menu (inventory or container) is bound. */
     static boolean serverBound(net.minecraft.server.MinecraftServer s) {
-        return ((PreviewMenu) player(s).inventoryMenu).seamless$preview().isBound();
+        ShulkerPreviewContainer preview = ((PreviewMenu) player(s).containerMenu).seamless$preview();
+        return preview != null && preview.isBound();
     }
 
     static ItemStack serverCarried(TestServerContext server) {
@@ -423,7 +538,7 @@ public class PreviewClientGameTest implements FabricClientGameTest {
     }
 
     static ItemStack serverSlot(TestServerContext server, int menuSlot) {
-        return server.computeOnServer(s -> player(s).inventoryMenu.getSlot(menuSlot).getItem().copy());
+        return server.computeOnServer(s -> player(s).containerMenu.getSlot(menuSlot).getItem().copy());
     }
 
     static List<ItemStack> serverBox(TestServerContext server) {
@@ -434,19 +549,36 @@ public class PreviewClientGameTest implements FabricClientGameTest {
         });
     }
 
+    /** Contents of the box in slot {@code menuSlot} of the open menu. */
+    static List<ItemStack> serverContents(TestServerContext server, int menuSlot) {
+        return server.computeOnServer(s -> {
+            NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
+            player(s).containerMenu.getSlot(menuSlot).getItem().getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items);
+            return items;
+        });
+    }
+
     static int serverBoxTotal(TestServerContext server, Item item) {
         return serverBox(server).stream().filter(stack -> stack.is(item)).mapToInt(ItemStack::getCount).sum();
+    }
+
+    static int count(ItemStack stack, Item item) {
+        int n = stack.is(item) ? stack.getCount() : 0;
+        ItemContainerContents contents = stack.get(DataComponents.CONTAINER);
+        if (contents != null) for (ItemStack inner : contents.itemCopies().toList()) if (inner.is(item)) n += inner.getCount();
+        return n;
     }
 
     static int serverTotal(TestServerContext server, Item item) {
         return server.computeOnServer(s -> {
             ServerPlayer p = player(s);
-            int n = p.containerMenu.getCarried().is(item) ? p.containerMenu.getCarried().getCount() : 0;
-            for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
-                ItemStack stack = p.getInventory().getItem(i);
-                if (stack.is(item)) n += stack.getCount();
-                ItemContainerContents contents = stack.get(DataComponents.CONTAINER);
-                if (contents != null) for (ItemStack inner : contents.itemCopies().toList()) if (inner.is(item)) n += inner.getCount();
+            int n = count(p.containerMenu.getCarried(), item);
+            for (int i = 0; i < p.getInventory().getContainerSize(); i++) n += count(p.getInventory().getItem(i), item);
+            // the open container, if any; preview slots only mirror a box and are not counted
+            if (p.containerMenu != p.inventoryMenu) {
+                for (Slot slot : p.containerMenu.slots) {
+                    if (slot.container != p.getInventory() && !(slot instanceof ShulkerPreviewSlot)) n += count(slot.getItem(), item);
+                }
             }
             return n;
         });

@@ -17,6 +17,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
@@ -25,6 +26,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.HashedStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.CraftingContainer;
+import net.minecraft.world.inventory.ResultContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
@@ -34,9 +37,11 @@ import org.jspecify.annotations.Nullable;
  * one source slot. It stays where it was opened while the cursor moves, and is closed when its
  * keys are released (unless locked), when the box leaves the slot, or when the screen closes.
  *
- * <p>An interactive pin binds the 27 preview slots of the player's inventory menu to the box, so
- * clicks inside the panel are ordinary vanilla container clicks on those slots (predicted here,
- * applied by the server). A display-only pin never touches any slot.
+ * <p>An interactive pin binds the 27 preview slots of the open menu to the box, so clicks inside
+ * the panel are ordinary vanilla container clicks on those slots (predicted here, applied by the
+ * server). That works for a box in the player's inventory and for a box lying in an opened storage
+ * container, in the inventory screen and in container screens. A display-only pin never touches
+ * any slot.
  *
  * <p>All state lives on the render thread.
  */
@@ -50,6 +55,9 @@ public final class PreviewController {
     private static int lastToken;
     private static int lastMouseX;
     private static int lastMouseY;
+    /** Debug builds: why Shift+Alt does nothing or only shows, drawn while the keys are held. */
+    private static @Nullable Component debugNotice;
+    private static @Nullable String lastDebugNotice;
 
     private PreviewController() {}
 
@@ -170,12 +178,13 @@ public final class PreviewController {
             close();
             p = null;
         }
+        boolean fullKeys = PreviewKeys.shift() && PreviewKeys.alt();
+        debugSettings(fullKeys);
         if (!ClientOptions.INSTANCE.preview || minecraft.player == null) {
             if (p != null) PreviewDebug.log("client: pin closed (preview disabled or no player)");
             close();
             return;
         }
-        boolean fullKeys = PreviewKeys.shift() && PreviewKeys.alt();
         if (p != null) {
             boolean dragging = ((AbstractContainerScreenAccessor) screen).seamless$isQuickCrafting();
             if (p.bound != null && !p.bound.isBound()) {
@@ -203,11 +212,33 @@ public final class PreviewController {
         }
     }
 
+    /**
+     * Debug builds only: while Shift+Alt are held, says on screen and once in the log when a setting
+     * turns the preview off or makes it display-only, so such a report explains itself.
+     */
+    private static void debugSettings(boolean fullKeys) {
+        if (!PreviewDebug.ENABLED) return;
+        String off = null;
+        if (!ClientOptions.INSTANCE.preview) {
+            off = "'Show preview' is OFF in the Seamless Shulkers settings, so there is no preview";
+        } else if (!ClientOptions.INSTANCE.interactivePreview) {
+            off = "'Editable full preview (Shift+Alt)' is OFF in the Seamless Shulkers settings, so the panel is display-only";
+        }
+        String shown = fullKeys ? off : null;
+        debugNotice = shown == null ? null : Component.literal("[Seamless Shulkers debug] " + shown);
+        if (shown != null && !shown.equals(lastDebugNotice)) PreviewDebug.log("client: Shift+Alt held but {}", shown);
+        lastDebugNotice = shown;
+    }
+
     /** Control toggles the lock of an open pin, or (without Shulker Box Tooltip) locks the Shift preview. */
     public static void keyPressed(AbstractContainerScreen<?> screen, int key) {
         PreviewDebug.log("client: key {} in {} (shift={} alt={} ctrl={}) pin={}", key, screen.getClass().getSimpleName(),
             PreviewKeys.shift(), PreviewKeys.alt(), PreviewKeys.control(), state());
-        if (!PreviewKeys.isControlKey(key) || !ClientOptions.INSTANCE.preview) return;
+        if (!PreviewKeys.isControlKey(key)) return;
+        if (!ClientOptions.INSTANCE.preview) {
+            PreviewDebug.log("client: Ctrl ignored, 'Show preview' is OFF in the Seamless Shulkers settings");
+            return;
+        }
         Pin p = pin;
         if (p != null && p.screen == screen) {
             p.locked = !p.locked;
@@ -231,43 +262,61 @@ public final class PreviewController {
         if (full) tryBind(p);
     }
 
-    /** Binds the preview slots to the box if this pin may edit it; otherwise the pin stays display-only. */
+    /**
+     * Binds the preview slots of the open menu to the box if this pin may edit it; otherwise the pin
+     * stays display-only. The client only rules out what it can know for sure; whether a container
+     * is real storage is decided by the server, which releases the binding if it refuses.
+     */
     private static void tryBind(Pin p) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         ClientPacketListener connection = minecraft.getConnection();
         if (!ClientOptions.INSTANCE.interactivePreview || player == null || connection == null || player.isSpectator()) {
-            PreviewDebug.log("client: display-only (interactive option={}, spectator={})", ClientOptions.INSTANCE.interactivePreview,
-                player != null && player.isSpectator());
+            PreviewDebug.log("client: display-only ({}spectator={})", ClientOptions.INSTANCE.interactivePreview ? ""
+                : "'Editable full preview (Shift+Alt)' is OFF in settings, ", player != null && player.isSpectator());
             return;
         }
-        if (p.screen.getMenu() != player.inventoryMenu || p.source.container != player.getInventory()) {
-            PreviewDebug.log("client: display-only (not the player inventory menu: {})", p.screen.getMenu().getClass().getName());
+        AbstractContainerMenu menu = p.screen.getMenu();
+        // The creative screen runs its own menu on top of the inventory menu and is display-only.
+        if (p.screen instanceof CreativeModeInventoryScreen || menu != player.containerMenu) {
+            PreviewDebug.log("client: display-only (screen {} does not show the open menu)", p.screen.getClass().getName());
             return;
         }
-        int inventorySlot = p.source.getContainerSlot();
-        ItemStack box = p.source.getItem();
-        if (!ShulkerRules.isBindableInventorySlot(inventorySlot) || !ShulkerRules.isEditable(box)) {
-            PreviewDebug.log("client: display-only (slot {} not bindable or box not editable: {})", inventorySlot, PreviewDebug.stack(box));
+        Slot source = p.source;
+        ItemStack box = source.getItem();
+        String why = null;
+        if (source instanceof ShulkerPreviewSlot || source.index < 0 || source.index >= menu.slots.size() || menu.slots.get(source.index) != source) {
+            why = "slot is not a slot of this menu";
+        } else if (source.container == player.getInventory()) {
+            if (!ShulkerRules.isBindableInventorySlot(source.getContainerSlot())) why = "armor slot";
+        } else if (menu == player.inventoryMenu) {
+            why = "crafting grid";
+        } else if (source.container instanceof CraftingContainer || source.container instanceof ResultContainer) {
+            why = "crafting input or result";
+        }
+        if (why == null && !ShulkerRules.isEditable(box)) why = "box not editable";
+        if (why != null) {
+            PreviewDebug.log("client: display-only ({}: {} {})", why, PreviewDebug.slot(source), source.container.getClass().getName());
             return;
         }
         if (!ClientPlayNetworking.canSend(PreviewBindRequest.TYPE)) {
-            PreviewDebug.log("client: display-only (server does not have the mod)");
+            PreviewDebug.log("client: display-only (server does not have this version of the mod)");
             return;
         }
-        PreviewMenu menu = (PreviewMenu) player.inventoryMenu;
-        ShulkerPreviewContainer container = menu.seamless$preview();
-        if (!container.bind(inventorySlot)) {
-            PreviewDebug.log("client: display-only (client bind of slot {} failed)", inventorySlot);
+        PreviewMenu host = (PreviewMenu) menu;
+        ShulkerPreviewContainer container = host.seamless$ensurePreview(false);
+        if (!container.bind(source)) {
+            PreviewDebug.log("client: display-only (client bind of {} failed)", PreviewDebug.slot(source));
             return;
         }
         p.bound = container;
-        p.firstSlot = menu.seamless$firstPreviewSlot();
-        p.containerId = player.inventoryMenu.containerId;
+        p.firstSlot = host.seamless$firstPreviewSlot();
+        p.containerId = menu.containerId;
         p.token = ++lastToken;
-        PreviewDebug.log("client: BIND sent slot={} token={} containerId={} firstPreviewSlot={} menuSlots={} box={}", inventorySlot, p.token,
-            p.containerId, p.firstSlot, player.inventoryMenu.slots.size(), PreviewDebug.stack(box));
-        ClientPlayNetworking.send(new PreviewBindRequest(p.containerId, inventorySlot, p.token,
+        PreviewDebug.log("client: BIND sent menuSlot={} token={} containerId={} menu={} holder={} firstPreviewSlot={} menuSlots={} box={}",
+            source.index, p.token, p.containerId, menu.getClass().getSimpleName(), source.container.getClass().getSimpleName(), p.firstSlot,
+            menu.slots.size(), PreviewDebug.stack(box));
+        ClientPlayNetworking.send(new PreviewBindRequest(p.containerId, source.index, p.firstSlot, p.token,
             HashedStack.create(box, connection.decoratedHashOpsGenenerator())));
     }
 
@@ -318,6 +367,7 @@ public final class PreviewController {
 
     /** Draws the pinned panel above the slots and below the carried stack and tooltips. */
     public static void render(AbstractContainerScreen<?> screen, GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        renderDebugNotice(screen, graphics);
         Pin p = pin;
         if (p == null || p.screen != screen) return;
         Font font = Minecraft.getInstance().font;
@@ -359,6 +409,16 @@ public final class PreviewController {
             PanelRenderer.compactGrid(graphics, font, merged, p.panelX, p.panelY, tint, hovered);
         }
         graphics.text(font, hint, p.x, p.panelY + panelHeight + HINT_GAP, -1, true);
+    }
+
+    private static void renderDebugNotice(AbstractContainerScreen<?> screen, GuiGraphicsExtractor graphics) {
+        Component notice = debugNotice;
+        if (notice == null) return;
+        Font font = Minecraft.getInstance().font;
+        List<net.minecraft.util.FormattedCharSequence> lines = font.split(notice, Math.max(100, screen.width - 16));
+        graphics.nextStratum();
+        graphics.fill(4, 4, 12 + lines.stream().mapToInt(font::width).max().orElse(0), 12 + lines.size() * font.lineHeight, 0xE0400000);
+        for (int i = 0; i < lines.size(); i++) graphics.text(font, lines.get(i), 8, 8 + i * font.lineHeight, 0xFFFFD0D0, true);
     }
 
     /** Full grid of the live preview slots, including vanilla's drag (quick-craft) ghost stacks. */

@@ -2,7 +2,6 @@ package dev.fayber.seamless.mixin;
 
 import dev.fayber.seamless.preview.PreviewMenu;
 import dev.fayber.seamless.preview.ShulkerPreviewContainer;
-import dev.fayber.seamless.preview.ShulkerPreviewSlot;
 import dev.fayber.seamless.preview.ShulkerRules;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -23,29 +22,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * High priority so the slots land after other mods' additions where possible.
  */
 @Mixin(value = InventoryMenu.class, priority = 2000)
-public abstract class InventoryMenuMixin implements PreviewMenu {
-    @Unique private ShulkerPreviewContainer seamless$preview;
-    @Unique private int seamless$firstSlot = -1;
-
+public abstract class InventoryMenuMixin {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void seamless$addPreviewSlots(Inventory inventory, boolean active, Player owner, CallbackInfo ci) {
         // InventoryMenu is constructed with active == !level.isClientSide()
-        seamless$preview = new ShulkerPreviewContainer(inventory, active);
-        AbstractContainerMenu self = (AbstractContainerMenu) (Object) this;
-        seamless$firstSlot = self.slots.size();
-        for (int i = 0; i < ShulkerRules.SIZE; i++) {
-            ((AbstractContainerMenuInvoker) self).seamless$addSlot(new ShulkerPreviewSlot(seamless$preview, i));
-        }
-    }
-
-    @Override
-    public ShulkerPreviewContainer seamless$preview() {
-        return seamless$preview;
-    }
-
-    @Override
-    public int seamless$firstPreviewSlot() {
-        return seamless$firstSlot;
+        ((PreviewMenu) this).seamless$ensurePreview(active);
     }
 
     /**
@@ -55,11 +36,14 @@ public abstract class InventoryMenuMixin implements PreviewMenu {
      */
     @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
     private void seamless$quickMove(Player player, int slotIndex, CallbackInfoReturnable<ItemStack> cir) {
-        int first = seamless$firstSlot;
+        PreviewMenu host = (PreviewMenu) this;
+        ShulkerPreviewContainer preview = host.seamless$preview();
+        if (preview == null) return;
+        int first = host.seamless$firstPreviewSlot();
         int end = first + ShulkerRules.SIZE;
         if (slotIndex >= first && slotIndex < end) {
             cir.setReturnValue(seamless$move(player, slotIndex, InventoryMenu.INV_SLOT_START, InventoryMenu.USE_ROW_SLOT_END, true));
-        } else if (slotIndex >= InventoryMenu.INV_SLOT_START && slotIndex <= InventoryMenu.SHIELD_SLOT && seamless$preview.isBound()
+        } else if (slotIndex >= InventoryMenu.INV_SLOT_START && slotIndex <= InventoryMenu.SHIELD_SLOT && preview.isBound()
             && ShulkerRules.mayStore(((AbstractContainerMenu) (Object) this).slots.get(slotIndex).getItem())) {
             // Items a shulker cannot hold (other shulker boxes) keep the vanilla inventory/hotbar route.
             cir.setReturnValue(seamless$move(player, slotIndex, first, end, false));
@@ -84,10 +68,5 @@ public abstract class InventoryMenuMixin implements PreviewMenu {
         if (stack.getCount() == original.getCount()) return ItemStack.EMPTY;
         slot.onTake(player, stack);
         return original;
-    }
-
-    @Inject(method = "removed", at = @At("HEAD"))
-    private void seamless$release(Player player, CallbackInfo ci) {
-        seamless$preview.unbind();
     }
 }

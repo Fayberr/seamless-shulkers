@@ -28,6 +28,9 @@ public final class SeamlessShulkersClient implements ClientModInitializer {
             dev.fayber.seamless.debug.PreviewDebug.log("DEBUG BUILD active. Loaded mods: {}", net.fabricmc.loader.api.FabricLoader.getInstance()
                 .getAllMods().stream().map(m -> m.getMetadata().getId() + "@" + m.getMetadata().getVersion().getFriendlyString())
                 .filter(m -> !m.startsWith("fabric-") && !m.startsWith("java@") && !m.startsWith("mixinextras")).sorted().toList());
+            dev.fayber.seamless.debug.PreviewDebug.log("Options at startup: {}", ClientOptions.INSTANCE.describe());
+            if (!ClientOptions.INSTANCE.preview) dev.fayber.seamless.debug.PreviewDebug.log("NOTE: 'Show preview' is OFF, so there is no preview at all");
+            if (!ClientOptions.INSTANCE.interactivePreview) dev.fayber.seamless.debug.PreviewDebug.log("NOTE: 'Editable full preview (Shift+Alt)' is OFF, so the Shift+Alt panel is display-only");
         }
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         ClientTooltipComponentCallback.EVENT.register(data ->

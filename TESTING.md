@@ -19,10 +19,17 @@ Each test drives a real `ServerPlayer` through `handleContainerClick` packets, p
 - `quickMoveCollectAndSwap`: Shift-click out and in, another shulker keeps the vanilla route, double-click collects across both inventories, number-key swaps in and out, self swap refused.
 - `unboundAndForgedClicksAreHarmless`: clicks into an unbound preview, slot 500, and a client that lies about the result are corrected without changes.
 - `staleClickResyncsWithoutPreviewSlots`: a stale state id leads to a full resync of the 46 vanilla slots only.
-- `bindRefusals`: wrong hash, different box, stacked boxes, oversized container, non-shulker, armor and offhand slots, wrong container id, other container open, spectator, refused rebind drops the old binding, release.
+- `bindRefusals`: wrong hash, different box, stacked boxes, oversized container, non-shulker, armor slots, wrong container id, stale menu, spectator, refused rebind drops the old binding, release, stale release cannot end a newer binding.
 - `bindingDiesWhenTheBoxChanges`: an identical copy cannot inherit a binding, the box changing or being moved ends it.
 - `componentsAndNesting`: named and damaged items and named boxes keep their components, shulker boxes cannot be nested.
 - `refillWhileBound`: auto refill from the bound box keeps both views consistent.
+
+- `chestWithBoxInInventory`: panel to chest and back, quick-move, normal chest routing, cross-inventory drag, close cleanup.
+- `chestWithBoxInside`: chest box to player and back, quick-move, external removal invalidates the binding.
+- `enderChestBox`: editing a stored ender-chest box.
+- `containerRefusals`: recipe/non-storage source refusal, inventory box in crafting screen, wrong offset/hash refusal.
+- `storageMenuRouting`: barrel, hopper, dispenser, furnace and placed shulker menus; quick-move both source locations where allowed, furnace fuel/result restrictions, cursor transfers.
+- `twoPlayersOneChest`: shared box edits refresh the other view, removal by another player ends the binding.
 
 ### Client game test (`PreviewClientGameTest`)
 
@@ -34,6 +41,7 @@ A box with 12, 17 and 46 arrows and 5 stone, plus one loose arrow:
 - Control locks the panel so the keys can be released, Control again closes it and the server releases the binding.
 - Clicks with real modifier flags (the harness drops them from simulated mouse input, so these are dispatched to the screen directly): Shift+Alt click picks up, a click with Shift+Alt+Ctrl held after locking picks up, a locked click without keys picks up, a locked Shift-click quick-moves out of and into the box.
 - Item conservation and client/server box equality at the end.
+- Chest scenarios run in singleplayer and against a dedicated server: both box locations, pickup, deposit, quick-move and pinned panel persistence.
 - `/seamlessshulkers` opens the settings screen.
 
 Screenshots of every state are written to `build/run/clientGameTest/screenshots`.
@@ -81,3 +89,9 @@ For in-game reports, install the debug JAR (see README) and send the `[SS-DEBUG]
 - [ ] Changed options persist across a restart in `config/seamless-shulkers.json`.
 
 **Release gate:** do not label a release stable until the manual items above are checked and any failures fixed.
+
+## Verified 2026-10-13 (alpha.8)
+
+- Eight unit tests and sixteen required server game tests passed, including container transfers, shared-chest invalidation and stale release handling.
+- Real-client inventory and chest scenarios passed in singleplayer and against a dedicated server, both without Shulker Box Tooltip (debug build) and with 5.4.2 (release build).
+- The client screenshots were inspected for the pinned full preview. Creative remains display-only. Real network latency and arbitrary third-party container menus have not been tested.

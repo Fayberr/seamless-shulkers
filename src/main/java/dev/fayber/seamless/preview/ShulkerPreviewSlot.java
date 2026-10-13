@@ -22,12 +22,12 @@ public final class ShulkerPreviewSlot extends Slot {
 
     @Override
     public boolean mayPlace(ItemStack stack) {
-        return preview.isBound() && ShulkerRules.mayStore(stack);
+        return preview.canPlaceItem(getContainerSlot(), stack);
     }
 
     @Override
     public boolean mayPickup(Player player) {
-        return preview.isBound();
+        return !preview.isSuspended() && preview.isBound();
     }
 
     @Override

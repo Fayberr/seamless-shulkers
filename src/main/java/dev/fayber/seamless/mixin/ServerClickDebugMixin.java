@@ -41,9 +41,11 @@ public abstract class ServerClickDebugMixin {
     }
 
     private String previewState() {
-        ShulkerPreviewContainer preview = ((PreviewMenu) player.inventoryMenu).seamless$preview();
+        AbstractContainerMenu menu = player.containerMenu;
+        ShulkerPreviewContainer preview = ((PreviewMenu) menu).seamless$preview();
+        if (preview == null) return "preview[none in " + menu.getClass().getSimpleName() + " menuSlots=" + menu.slots.size() + "]";
         return "preview[bound=" + preview.isBound() + " slot=" + preview.boundSlot() + " token=" + preview.token()
-            + " firstSlot=" + ((PreviewMenu) player.inventoryMenu).seamless$firstPreviewSlot()
-            + " menuSlots=" + player.inventoryMenu.slots.size() + "]";
+            + " firstSlot=" + ((PreviewMenu) menu).seamless$firstPreviewSlot()
+            + " menuSlots=" + menu.slots.size() + "]";
     }
 }
